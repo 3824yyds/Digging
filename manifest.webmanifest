@@ -1,0 +1,9 @@
+{
+  "name": "躲避方块 Plus",
+  "short_name": "躲避方块+",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0e0e10",
+  "theme_color": "#0e0e10",
+  "icons": []
+}

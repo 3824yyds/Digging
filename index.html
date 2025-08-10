@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0e0e10">
+<title>躲避方块 - Plus</title>
+<style>
+  html,body{margin:0;height:100%;background:#0e0e10;color:#e6edf3;font-family:system-ui,Segoe UI,Roboto}
+  #wrap{display:flex;flex-direction:column;height:100%;align-items:center;justify-content:center;gap:10px;padding:10px}
+  canvas{background:#111;border:2px solid #333;border-radius:10px;touch-action:none;max-width:95vw;height:auto}
+  .row{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+  button,select,label{background:#161b22;color:#e6edf3;border:1px solid #30363d;border-radius:8px;padding:10px 12px;font-size:14px}
+  button{cursor:pointer}
+  button:active{transform:translateY(1px)}
+  .toggle{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:20px}
+  .hint{opacity:.8;font-size:12px;text-align:center}
+  .brand{position:fixed;top:8px;left:10px;font-size:12px;opacity:.7}
+</style>
+</head>
+<body>
+<div class="brand">躲避方块 · Plus</div>
+<div id="wrap">
+  <canvas id="game" width="420" height="640"></canvas>
+  <div class="row">
+    <button id="btnStart">开始 / 重来</button>
+    <button id="btnPause">暂停</button>
+    <label class="toggle"><input type="checkbox" id="sound" checked>开启音效</label>
+    <label>难度：
+      <select id="diff">
+        <option value="easy">简单</option>
+        <option value="normal" selected>普通</option>
+        <option value="hard">困难</option>
+        <option value="hell">地狱</option>
+      </select>
+    </label>
+  </div>
+  <div class="hint">PC：方向键/WSAD 移动・P 暂停｜手机：点按画面左/右半区移动｜支持离线与添加到主屏幕</div>
+</div>
+
+<script>
+(() => {
+  const cvs = document.getElementById('game');
+  const ctx = cvs.getContext('2d');
+  const W = cvs.width, H = cvs.height;
+
+  // --- Audio (无资源，纯合成音) ---
+  let audioCtx;
+  const soundOn = () => document.getElementById('sound').checked;
+  function beep(type='sine', f=440, dur=0.08, vol=0.2){
+    if(!soundOn()) return;
+    try{
+      if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+      const t0 = audioCtx.currentTime;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type; o.frequency.setValueAtTime(f, t0);
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(vol, t0+0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t0); o.stop(t0+dur+0.02);
+    }catch(e){}
+  }
+  const sfx = {
+    start: () => { beep('triangle', 660, .07, .18); setTimeout(()=>beep('triangle', 880, .07, .18), 90); },
+    star:  () => beep('square', 1200, .05, .15),
+    hit:   () => { beep('sawtooth', 220, .12, .25); setTimeout(()=>beep('sawtooth', 110, .2, .25), 60); }
+  };
+
+  // --- Game state ---
+  let running = false, paused = false, last = 0;
+  const player = {x: W/2, y: H-70, w: 36, h: 36, spd: 240, vx:0};
+  let obstacles = [], stars = [];
+  let time = 0, score = 0, best = +localStorage.mini_dodge_best_v2 || 0;
+  let spawnTimer = 0, starTimer = 0, difficulty = 1;
+
+  // 难度参数
+  const diffSel = document.getElementById('diff');
+  function getDiffCfg(){
+    const d = diffSel.value;
+    if (d==='easy')   return {spd:1.0, spawn:0.9, accel:0.015, player:280};
+    if (d==='hard')   return {spd:1.25, spawn:0.65, accel:0.025, player:250};
+    if (d==='hell')   return {spd:1.5, spawn:0.5, accel:0.03,  player:240};
+    return {spd:1.1, spawn:0.75, accel:0.02, player:260}; // normal
+  }
+
+  function reset() {
+    const cfg = getDiffCfg();
+    player.x = W/2; player.vx = 0; player.spd = cfg.player;
+    obstacles = []; stars = [];
+    time = 0; score = 0; spawnTimer = 0; starTimer = 0;
+    difficulty = 1;
+  }
+
+  // Input
+  const keys = new Set();
+  window.addEventListener('keydown', e => {
+    if (['ArrowLeft','ArrowRight','a','d','A','D','w','s','W','S'].includes(e.key)) { keys.add(e.key.toLowerCase()); e.preventDefault(); }
+    if (e.key.toLowerCase()==='p') togglePause();
+  }, {passive:false});
+  window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+
+  // Touch
+  let touchDir = 0;
+  function touchX(e){ return e.touches[0].clientX - cvs.getBoundingClientRect().left; }
+  function handleTouch(x) { touchDir = (x < cvs.width/2) ? -1 : 1; }
+  cvs.addEventListener('touchstart', e => { handleTouch(touchX(e)); e.preventDefault(); }, {passive:false});
+  cvs.addEventListener('touchmove',  e => { handleTouch(touchX(e)); e.preventDefault(); }, {passive:false});
+  cvs.addEventListener('touchend',  () => { touchDir = 0; });
+
+  // Buttons
+  document.getElementById('btnStart').onclick = () => { reset(); running = true; paused = false; last = performance.now(); sfx.start(); loop(last); };
+  document.getElementById('btnPause').onclick = togglePause;
+  diffSel.addEventListener('change', () => { if(!running) reset(); });
+  function togglePause(){ if (!running) return; paused = !paused; if (!paused) { last = performance.now(); loop(last); } }
+
+  // Utils
+  function rand(a,b){ return Math.random()*(b-a)+a; }
+  function rect(a,b){ return !(a.x+a.w<b.x || b.x+b.w<a.x || a.y+a.h<b.y || b.y+b.h<a.y); }
+
+  function spawnObstacle(){
+    const cfg = getDiffCfg();
+    const w = Math.random()*(58-28)+28;
+    const x = Math.random()*((W - 8) - (8 + w)) + (8);
+    const spd = (Math.random()*(160-120)+120) * difficulty * cfg.spd;
+    obstacles.push({x, y:-w, w, h:w, vy: spd});
+  }
+
+  function spawnStar() {
+    const s = 18;
+    const x = Math.random()*((W - 8) - (8 + s)) + (8);
+    const vy = Math.random()*(140-90)+90;
+    stars.push({x, y:-s, w:s, h:s, vy});
+  }
+
+  function update(dt){
+    const cfg = getDiffCfg();
+    time += dt; score += (dt*10)|0;
+    difficulty = 1 + Math.min(2.5, time/25);
+
+    // Player control
+    let dir = 0;
+    if (keys.has('arrowleft') || keys.has('a')) dir -= 1;
+    if (keys.has('arrowright') || keys.has('d')) dir += 1;
+    dir = touchDir || dir;
+    player.vx = dir * player.spd;
+    player.x += player.vx*dt;
+    player.x = Math.max(6, Math.min(W - player.w - 6, player.x));
+
+    // Spawn
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) {
+      spawnObstacle();
+      spawnTimer = Math.max(0.12, cfg.spawn - time*cfg.accel);
+    }
+    starTimer -= dt;
+    if (starTimer <= 0) {
+      spawnStar();
+      starTimer = Math.random()*(3.2-1.6)+1.6;
+    }
+
+    // Move
+    obstacles.forEach(o => o.y += o.vy*dt);
+    stars.forEach(s => s.y += s.vy*dt);
+
+    // Collisions
+    obstacles = obstacles.filter(o => {
+      if (rect({...player}, o)) gameOver();
+      return o.y < H + 60;
+    });
+    stars = stars.filter(s => {
+      if (rect({...player}, s)) { score += 120; sfx.star(); return false; }
+      return s.y < H + 40;
+    });
+  }
+
+  function draw(){
+    // BG
+    const grad = ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0,'#0b0c10'); grad.addColorStop(1,'#12141a');
+    ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+
+    // Score bar
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = 'bold 22px system-ui, Segoe UI';
+    ctx.fillText(`得分：${score}  最高：${best}`, 14, 30);
+    ctx.font = '12px system-ui'; ctx.globalAlpha = .8;
+    ctx.fillText(`难度：${diffSel.options[diffSel.selectedIndex].text}`, 14, 50);
+    ctx.globalAlpha = 1;
+
+    // Player
+    roundRect(player.x, player.y, player.w, player.h, 8, '#3fb950');
+
+    // Obstacles
+    obstacles.forEach(o => roundRect(o.x, o.y, o.w, o.h, 6, '#ff4d4f'));
+
+    // Stars
+    stars.forEach(s => drawStar(s.x+s.w/2, s.y+s.h/2, 5, s.w/2, s.w/4, '#ffd866'));
+
+    if (!running){
+      overlay(`躲避方块+`, '按「开始」或回车键开始');
+    } else if (paused){
+      overlay('暂停', '按「暂停」或 P 继续');
+    }
+  }
+
+  function overlay(title, sub){
+    ctx.fillStyle = 'rgba(0,0,0,.45)';
+    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = 'bold 36px system-ui';
+    ctx.textAlign='center';
+    ctx.fillText(title, W/2, H/2 - 10);
+    ctx.font = '16px system-ui';
+    ctx.fillText(sub, W/2, H/2 + 22);
+    ctx.textAlign='start';
+  }
+
+  function gameOver(){
+    running = false;
+    best = Math.max(best, score);
+    localStorage.mini_dodge_best_v2 = best;
+    sfx.hit();
+    draw();
+    overlay('游戏结束', '再试一次吧！');
+  }
+
+  function loop(ts){
+    if (!running) return;
+    const dt = Math.min(0.033, (ts - last)/1000);
+    last = ts;
+    if (!paused){
+      update(dt);
+      draw();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  // Helpers
+  function roundRect(x,y,w,h,r, color){
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+    ctx.fill();
+  }
+  function drawStar(cx, cy, spikes, outerR, innerR, color){
+    let rot = Math.PI/2 * 3, x=cx, y=cy;
+    const step = Math.PI/spikes;
+    ctx.beginPath(); ctx.moveTo(cx, cy - outerR);
+    for (let i=0;i<spikes;i++){
+      x = cx + Math.cos(rot)*outerR; y = cy + Math.sin(rot)*outerR; ctx.lineTo(x,y); rot+=step;
+      x = cx + Math.cos(rot)*innerR; y = cy + Math.sin(rot)*innerR; ctx.lineTo(x,y); rot+=step;
+    }
+    ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+  }
+
+  // Enter to start/restart
+  window.addEventListener('keydown', e=>{
+    if (e.key === 'Enter'){
+      if (!running){ document.getElementById('btnStart').click(); }
+      else if (paused){ togglePause(); }
+    }
+  });
+
+  // First paint
+  draw();
+
+  // --- PWA 注册 ---
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js');
+    });
+  }
+})();
+</script>
+</body>
+</html>
