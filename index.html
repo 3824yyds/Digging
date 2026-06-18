@@ -62,6 +62,17 @@
     border:1px solid rgba(255,255,255,.14);font-size:20px;cursor:pointer}
   .sysbtns button:active{transform:translateY(1px)}
 
+  /* mobile action button (hidden on non-touch) */
+  #actBtn{display:none;position:absolute;bottom:90px;right:18px;width:88px;height:88px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#aed581,#558b2f);color:#173817;font-weight:800;font-size:18px;
+    border:3px solid rgba(255,255,255,.5);box-shadow:0 8px 22px rgba(0,0,0,.45);pointer-events:auto;
+    flex-direction:column;align-items:center;justify-content:center;line-height:1.1;letter-spacing:1px}
+  #actBtn small{font-size:11px;opacity:.7;font-weight:600}
+  #actBtn:active{transform:scale(.92)}
+  body.touch #actBtn{display:flex}
+  /* on touch, lift hotbar a touch and shrink sys buttons row to avoid overlap */
+  body.touch .sysbtns{bottom:188px}
+
   .toast{position:absolute;top:64px;left:50%;transform:translateX(-50%);background:var(--panel2);
     padding:8px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .3s;border:1px solid rgba(255,255,255,.14)}
   .toast.show{opacity:1}
@@ -149,6 +160,9 @@
     <button id="btnBag" title="背包 (Tab)">🎒</button>
     <button id="btnMenu" title="菜单 (Esc)">☰</button>
   </div>
+
+  <!-- mobile touch controls -->
+  <button id="actBtn" title="使用 / 交互">使用<small>E</small></button>
 </div>
 
 <!-- Start / Menu modal -->
@@ -664,9 +678,10 @@ addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
 // camera orbit
 let camYaw=Math.PI, camPitch=0.5, camDist=12, dragging=false, lastX=0,lastY=0;
 const dom=renderer.domElement;
-dom.addEventListener('pointerdown',e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; });
+dom.addEventListener('pointerdown',e=>{ if(e.pointerType==='touch') return; dragging=true; lastX=e.clientX; lastY=e.clientY; });
 addEventListener('pointerup',()=>dragging=false);
 addEventListener('pointermove',e=>{
+  if(e.pointerType==='touch') return;
   if(!dragging) return;
   camYaw -= (e.clientX-lastX)*0.005; camPitch -= (e.clientY-lastY)*0.005;
   camPitch=Math.max(0.12,Math.min(1.3,camPitch)); lastX=e.clientX; lastY=e.clientY;
@@ -1093,9 +1108,11 @@ function update(dt){
   else hl.visible=false;
 
   // ----- interaction hints -----
-  let hint='移动 <b>WASD</b> · 转视角 <b>拖拽</b> · 工具 <b>E</b> · 切换 <b>1~6</b>';
-  for(const z of interactZones){ if(player.position.distanceTo(z.pos)<z.r){ hint=z.hint; } }
-  for(const a of S.animals){ if(player.position.distanceTo(a.mesh.position)<2.4){ hint = a.hasProduct? `按 E 收集 ${a.emoji}` : (S.tool==='feed'?'按 E 喂食':'按 E 抚摸 🐾'); } }
+  const useK = isTouch ? '绿色按钮' : '<b>E</b>';
+  let hint = isTouch ? '左半屏拖动 移动 · 右半屏拖动 转视角 · 点 ⬤ 使用工具'
+                     : '移动 <b>WASD</b> · 转视角 <b>拖拽</b> · 工具 <b>E</b> · 切换 <b>1~6</b>';
+  for(const z of interactZones){ if(player.position.distanceTo(z.pos)<z.r){ hint = z.hint.replace('按 E','点 '+useK).replace(' E ',' '+useK+' '); } }
+  for(const a of S.animals){ if(player.position.distanceTo(a.mesh.position)<2.4){ hint = a.hasProduct? `点 ${useK} 收集 ${a.emoji}` : (S.tool==='feed'?`点 ${useK} 喂食`:`点 ${useK} 抚摸 🐾`); } }
   document.getElementById('helpText').innerHTML=hint;
 
   // ----- time of day -----
@@ -1204,6 +1221,14 @@ function startGame(fromSave){
   toast(fromSave?'欢迎回到田园 🌾':'欢迎来到永续田园！锄地(1)→播种(2)→浇水(3)→收获(4)');
 }
 document.getElementById('btnStart').onclick=()=>{ startGame(false); };
+
+// ---------------- Touch / mobile controls ----------------
+const isTouch = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window || navigator.maxTouchPoints>0;
+if(isTouch) document.body.classList.add('touch');
+const actBtn=document.getElementById('actBtn');
+// use pointerdown so it fires instantly and never gets swallowed by the canvas look-drag
+actBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); if(S.started&&!S.paused) interact(); }, {passive:false});
+actBtn.addEventListener('touchstart', e=>{ e.preventDefault(); e.stopPropagation(); }, {passive:false});
 
 // loader sequence
 const lb=document.getElementById('loadbar'), tip=document.getElementById('loadtip');
