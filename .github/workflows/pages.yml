@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - claude/perpetual-garden-farm-game-njcw09
+      - main
   workflow_dispatch:
 
 permissions:
