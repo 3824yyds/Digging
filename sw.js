@@ -1,4 +1,4 @@
-const CACHE = 'perpetual-garden-v1';
+const CACHE = 'perpetual-garden-v2';
 const CORE = [
   './',
   './index.html',
