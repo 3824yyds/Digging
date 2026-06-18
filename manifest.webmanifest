@@ -1,9 +1,11 @@
 {
-  "name": "躲避方块 Plus",
-  "short_name": "躲避方块+",
+  "name": "永续田园 Perpetual Garden",
+  "short_name": "永续田园",
+  "description": "精美治愈的 3D 农场模拟游戏：耕作、养殖、建造、探索，打造你的繁荣家园。",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0e0e10",
-  "theme_color": "#0e0e10",
+  "orientation": "any",
+  "background_color": "#243a1e",
+  "theme_color": "#7cb342",
   "icons": []
 }

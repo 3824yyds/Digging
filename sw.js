@@ -1,4 +1,4 @@
-const CACHE = 'dodge-plus-v1';
+const CACHE = 'perpetual-garden-v1';
 const CORE = [
   './',
   './index.html',
@@ -22,10 +22,12 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const req = e.request;
+  // network-first for the three.js CDN module so it stays fresh, cache fallback for offline
   e.respondWith(
     caches.match(req).then(cached => cached || fetch(req).then(res => {
       try {
-        if (req.method === 'GET' && new URL(req.url).origin === location.origin) {
+        const url = new URL(req.url);
+        if (req.method === 'GET' && (url.origin === location.origin || url.host.includes('jsdelivr.net'))) {
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(req, clone));
         }

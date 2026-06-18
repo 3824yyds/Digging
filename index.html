@@ -2,283 +2,1235 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover" />
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0e0e10">
-<title>躲避方块 - Plus</title>
+<meta name="theme-color" content="#7cb342">
+<title>永续田园 · Perpetual Garden</title>
 <style>
-  html,body{margin:0;height:100%;background:#0e0e10;color:#e6edf3;font-family:system-ui,Segoe UI,Roboto}
-  #wrap{display:flex;flex-direction:column;height:100%;align-items:center;justify-content:center;gap:10px;padding:10px}
-  canvas{background:#111;border:2px solid #333;border-radius:10px;touch-action:none;max-width:95vw;height:auto}
-  .row{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
-  button,select,label{background:#161b22;color:#e6edf3;border:1px solid #30363d;border-radius:8px;padding:10px 12px;font-size:14px}
-  button{cursor:pointer}
-  button:active{transform:translateY(1px)}
-  .toggle{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:20px}
-  .hint{opacity:.8;font-size:12px;text-align:center}
-  .brand{position:fixed;top:8px;left:10px;font-size:12px;opacity:.7}
+  :root{
+    --wood:#6b4f2a; --wood2:#8a6a3b; --leaf:#7cb342; --cream:#fff7e6;
+    --panel:rgba(38,28,18,.82); --panel2:rgba(58,44,28,.92); --gold:#ffd866;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0e1410;color:var(--cream);
+    font-family:"PingFang SC","Microsoft YaHei",system-ui,Segoe UI,Roboto,sans-serif;user-select:none;-webkit-user-select:none}
+  canvas{display:block}
+  #app{position:fixed;inset:0}
+
+  /* ---------- Loading ---------- */
+  #loader{position:fixed;inset:0;background:linear-gradient(160deg,#243a1e,#11201a);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:50;transition:opacity .8s}
+  #loader h1{font-size:34px;margin:0;letter-spacing:6px;text-shadow:0 3px 12px rgba(0,0,0,.5)}
+  #loader .sub{opacity:.8;font-size:13px;letter-spacing:2px}
+  .bar{width:240px;height:8px;border-radius:8px;background:rgba(255,255,255,.15);overflow:hidden}
+  .bar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--leaf),var(--gold));transition:width .3s}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:20}
+  .topbar{position:absolute;top:10px;left:50%;transform:translateX(-50%);
+    display:flex;gap:10px;align-items:center;background:var(--panel);border:1px solid rgba(255,255,255,.12);
+    border-radius:14px;padding:8px 14px;backdrop-filter:blur(6px);box-shadow:0 6px 20px rgba(0,0,0,.35)}
+  .chip{display:flex;align-items:center;gap:6px;font-size:14px;white-space:nowrap}
+  .chip b{font-weight:700}
+  .sep{width:1px;height:20px;background:rgba(255,255,255,.18)}
+
+  .stats{position:absolute;top:12px;left:12px;display:flex;flex-direction:column;gap:8px}
+  .stat{display:flex;align-items:center;gap:8px;background:var(--panel);border-radius:12px;padding:6px 10px;border:1px solid rgba(255,255,255,.1)}
+  .meter{width:130px;height:12px;border-radius:8px;background:rgba(0,0,0,.35);overflow:hidden}
+  .meter>i{display:block;height:100%;width:100%;border-radius:8px;transition:width .25s}
+  .e>i{background:linear-gradient(90deg,#9ccc65,#558b2f)}
+  .money{position:absolute;top:12px;right:12px;background:var(--panel);border-radius:12px;padding:8px 14px;
+    border:1px solid rgba(255,255,255,.1);font-size:16px;font-weight:700}
+  .money small{color:var(--gold)}
+
+  /* hotbar */
+  #hotbar{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:8px;pointer-events:auto}
+  .slot{width:60px;height:60px;border-radius:14px;background:var(--panel);border:2px solid rgba(255,255,255,.12);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:.15s;position:relative}
+  .slot .ic{font-size:24px;line-height:1}
+  .slot .nm{font-size:10px;opacity:.85;margin-top:2px}
+  .slot .key{position:absolute;top:2px;left:5px;font-size:9px;opacity:.6}
+  .slot.active{border-color:var(--gold);background:var(--panel2);transform:translateY(-4px);box-shadow:0 8px 18px rgba(0,0,0,.4)}
+  .slot .cnt{position:absolute;bottom:1px;right:4px;font-size:10px;color:var(--gold);font-weight:700}
+
+  .help{position:absolute;bottom:84px;left:50%;transform:translateX(-50%);font-size:12px;opacity:.78;text-align:center;
+    background:rgba(0,0,0,.35);padding:5px 12px;border-radius:10px}
+
+  /* bottom-right buttons */
+  .sysbtns{position:absolute;bottom:14px;right:12px;display:flex;flex-direction:column;gap:8px;pointer-events:auto}
+  .sysbtns button{width:46px;height:46px;border-radius:12px;background:var(--panel);color:var(--cream);
+    border:1px solid rgba(255,255,255,.14);font-size:20px;cursor:pointer}
+  .sysbtns button:active{transform:translateY(1px)}
+
+  .toast{position:absolute;top:64px;left:50%;transform:translateX(-50%);background:var(--panel2);
+    padding:8px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .3s;border:1px solid rgba(255,255,255,.14)}
+  .toast.show{opacity:1}
+
+  /* ---------- Panels (shop/inventory/menu) ---------- */
+  .modal{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.5);backdrop-filter:blur(3px);pointer-events:auto}
+  .modal.show{display:flex}
+  .card{width:min(680px,94vw);max-height:86vh;overflow:auto;background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border:2px solid rgba(255,255,255,.14);border-radius:18px;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .card h2{margin:0 0 12px;font-size:22px;display:flex;align-items:center;gap:8px}
+  .card .x{margin-left:auto;cursor:pointer;font-size:20px;opacity:.7;border:none;background:none;color:var(--cream)}
+  .tabs{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .tabs button{background:rgba(0,0,0,.25);color:var(--cream);border:1px solid rgba(255,255,255,.14);
+    padding:6px 12px;border-radius:10px;cursor:pointer;font-size:13px}
+  .tabs button.on{background:var(--leaf);border-color:var(--leaf);color:#173}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .item{background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px;text-align:center}
+  .item .em{font-size:30px}
+  .item .t{font-size:14px;margin:4px 0 2px;font-weight:600}
+  .item .d{font-size:11px;opacity:.7;min-height:28px}
+  .item .p{color:var(--gold);font-weight:700;font-size:13px;margin:4px 0}
+  .item button{width:100%;background:var(--leaf);border:none;color:#16310f;font-weight:700;padding:6px;border-radius:9px;cursor:pointer;margin-top:4px}
+  .item button.sell{background:var(--gold)}
+  .item button:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(1)}
+  .empty{opacity:.6;text-align:center;padding:30px;font-size:14px}
+
+  .startbtn{background:linear-gradient(90deg,var(--leaf),#aed581);border:none;color:#173817;font-weight:800;
+    padding:14px 34px;border-radius:14px;font-size:18px;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.4);letter-spacing:2px}
+  .startbtn:active{transform:translateY(2px)}
+  .keys{font-size:13px;line-height:2;opacity:.92}
+  .keys kbd{background:rgba(255,255,255,.15);border-radius:6px;padding:1px 8px;border:1px solid rgba(255,255,255,.2);font-family:inherit;margin:0 2px}
+
+  /* night/weather vignette */
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:15;box-shadow:inset 0 0 220px rgba(0,0,20,0);transition:box-shadow 2s}
+
+  @media (max-width:560px){
+    .topbar{gap:6px;padding:6px 9px;font-size:12px}
+    .chip{font-size:12px}
+    .slot{width:50px;height:50px}
+    .meter{width:90px}
+  }
 </style>
 </head>
 <body>
-<div class="brand">躲避方块 · Plus</div>
-<div id="wrap">
-  <canvas id="game" width="420" height="640"></canvas>
-  <div class="row">
-    <button id="btnStart">开始 / 重来</button>
-    <button id="btnPause">暂停</button>
-    <label class="toggle"><input type="checkbox" id="sound" checked>开启音效</label>
-    <label>难度：
-      <select id="diff">
-        <option value="easy">简单</option>
-        <option value="normal" selected>普通</option>
-        <option value="hard">困难</option>
-        <option value="hell">地狱</option>
-      </select>
-    </label>
-  </div>
-  <div class="hint">PC：方向键/WSAD 移动・P 暂停｜手机：点按画面左/右半区移动｜支持离线与添加到主屏幕</div>
+<div id="app"></div>
+<div id="vignette"></div>
+
+<!-- Loading -->
+<div id="loader">
+  <h1>永 续 田 园</h1>
+  <div class="sub">PERPETUAL GARDEN · 3D 农场模拟</div>
+  <div class="bar"><i id="loadbar"></i></div>
+  <div class="sub" id="loadtip">正在播种世界…</div>
 </div>
 
-<script>
-(() => {
-  const cvs = document.getElementById('game');
-  const ctx = cvs.getContext('2d');
-  const W = cvs.width, H = cvs.height;
+<!-- HUD -->
+<div id="hud" style="display:none">
+  <div class="topbar">
+    <div class="chip" id="seasonChip">🌸 <b>春</b></div>
+    <div class="sep"></div>
+    <div class="chip">📅 第 <b id="dayNum">1</b> 天</div>
+    <div class="sep"></div>
+    <div class="chip" id="clockChip">🕖 <b>06:00</b></div>
+    <div class="sep"></div>
+    <div class="chip" id="weatherChip">☀️ <b>晴</b></div>
+  </div>
 
-  // --- Audio (无资源，纯合成音) ---
-  let audioCtx;
-  const soundOn = () => document.getElementById('sound').checked;
-  function beep(type='sine', f=440, dur=0.08, vol=0.2){
-    if(!soundOn()) return;
-    try{
-      if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-      const t0 = audioCtx.currentTime;
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = type; o.frequency.setValueAtTime(f, t0);
-      g.gain.setValueAtTime(0, t0);
-      g.gain.linearRampToValueAtTime(vol, t0+0.005);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
-      o.connect(g).connect(audioCtx.destination);
-      o.start(t0); o.stop(t0+dur+0.02);
-    }catch(e){}
+  <div class="stats">
+    <div class="stat">
+      <span>⚡</span>
+      <div class="meter e"><i id="energyBar"></i></div>
+    </div>
+  </div>
+
+  <div class="money">💰 <small id="money">500</small></div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="help" id="helpText">移动 <b>WASD</b> · 转视角 <b>拖拽鼠标</b> · 使用工具 <b>E</b> · 商店/睡觉 靠近建筑按 <b>E</b></div>
+
+  <div id="hotbar"></div>
+
+  <div class="sysbtns">
+    <button id="btnBag" title="背包 (Tab)">🎒</button>
+    <button id="btnMenu" title="菜单 (Esc)">☰</button>
+  </div>
+</div>
+
+<!-- Start / Menu modal -->
+<div class="modal" id="menuModal">
+  <div class="card" style="text-align:center">
+    <h2 style="justify-content:center">🌾 永续田园</h2>
+    <p style="opacity:.85;font-size:14px;line-height:1.7">
+      你从喧嚣的城市来到宁静乡村，继承了一座破败的农场。<br>
+      耕作、养殖、建造、探索，把它打造成你的繁荣家园。
+    </p>
+    <div class="keys" style="text-align:left;display:inline-block;margin:6px auto 16px">
+      <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动 · <kbd>Shift</kbd> 奔跑</div>
+      <div>拖拽鼠标 转动视角 · 滚轮 缩放</div>
+      <div><kbd>E</kbd> 使用工具 / 交互 · <kbd>1</kbd>~<kbd>6</kbd> 切换工具</div>
+      <div><kbd>Tab</kbd> 背包 · <kbd>Esc</kbd> 菜单</div>
+      <div>靠近 🏪 商店 / 🛏️ 床 按 <kbd>E</kbd> 互动</div>
+    </div>
+    <div>
+      <button class="startbtn" id="btnStart">开 始 田 园 生 活</button>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:10px;justify-content:center">
+      <button class="tabs" style="display:none"></button>
+      <button id="btnSave" class="tabs" style="background:rgba(0,0,0,.25)">💾 保存进度</button>
+      <button id="btnReset" class="tabs" style="background:rgba(0,0,0,.25)">🗑️ 重置存档</button>
+    </div>
+    <div class="sub" id="saveInfo" style="margin-top:10px;opacity:.6;font-size:12px"></div>
+  </div>
+</div>
+
+<!-- Shop modal -->
+<div class="modal" id="shopModal">
+  <div class="card">
+    <h2>🏪 乡村商店 <button class="x" data-close="shopModal">✕</button></h2>
+    <div class="tabs" id="shopTabs">
+      <button class="on" data-tab="buy">🛒 购买</button>
+      <button data-tab="sell">💵 出售</button>
+    </div>
+    <div class="grid" id="shopGrid"></div>
+  </div>
+</div>
+
+<!-- Inventory modal -->
+<div class="modal" id="bagModal">
+  <div class="card">
+    <h2>🎒 背包 <button class="x" data-close="bagModal">✕</button></h2>
+    <div class="grid" id="bagGrid"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ============================================================
+   永续田园  Perpetual Garden — 3D Farm Simulation (Three.js)
+   ============================================================ */
+
+// ---------------- Config / Data ----------------
+const GRID = 24;                 // farm grid size (tiles)
+const TILE = 2;                  // world size per tile
+const HALF = (GRID*TILE)/2;
+const DAY_SECONDS = 150;         // real seconds per in-game day
+const SEASONS = ['春','夏','秋','冬'];
+const SEASON_EMOJI = ['🌸','🦋','🍂','❄️'];
+const DAYS_PER_SEASON = 7;
+
+const CROPS = {
+  wheat:     {name:'小麦', emoji:'🌾', seedCost:12, sell:25, days:4, seasons:[0,1,2], color:0xe3c75a, tall:1.4},
+  carrot:    {name:'胡萝卜', emoji:'🥕', seedCost:15, sell:35, days:3, seasons:[0,2], color:0xe57c2a, tall:0.9},
+  potato:    {name:'土豆', emoji:'🥔', seedCost:18, sell:42, days:4, seasons:[0,2], color:0xb98a4a, tall:0.8},
+  tomato:    {name:'西红柿', emoji:'🍅', seedCost:25, sell:60, days:5, seasons:[1], color:0xe24a3a, tall:1.6},
+  strawberry:{name:'草莓', emoji:'🍓', seedCost:30, sell:70, days:5, seasons:[0], color:0xe23a5a, tall:0.7},
+  corn:      {name:'玉米', emoji:'🌽', seedCost:22, sell:55, days:6, seasons:[1,2], color:0xf2d24a, tall:2.0},
+  watermelon:{name:'西瓜', emoji:'🍉', seedCost:40, sell:110, days:7, seasons:[1], color:0x3a9a4a, tall:0.8},
+  sunflower: {name:'向日葵', emoji:'🌻', seedCost:28, sell:65, days:5, seasons:[1,2], color:0xf2c01a, tall:2.2},
+  rose:      {name:'玫瑰', emoji:'🌹', seedCost:35, sell:90, days:6, seasons:[0,1], color:0xd81b60, tall:1.1},
+  pumpkin:   {name:'南瓜', emoji:'🎃', seedCost:45, sell:130, days:8, seasons:[2], color:0xe07820, tall:0.9},
+};
+
+const TOOLS = [
+  {id:'hoe',   name:'锄头', icon:'⛏️', key:'1'},
+  {id:'seed',  name:'种子', icon:'🌱', key:'2'},
+  {id:'water', name:'水壶', icon:'🪣', key:'3'},
+  {id:'hand',  name:'收获', icon:'✋', key:'4'},
+  {id:'feed',  name:'喂食', icon:'🌾', key:'5'},
+  {id:'build', name:'建造', icon:'🔨', key:'6'},
+];
+
+const BUILDABLES = {
+  fence:    {name:'木栅栏', emoji:'🪵', cost:20, h:1.0},
+  lantern:  {name:'灯笼',   emoji:'🏮', cost:35, h:1.6},
+  flower:   {name:'花坛',   emoji:'🌷', cost:25, h:0.4},
+  scarecrow:{name:'稻草人', emoji:'🧍', cost:60, h:2.0},
+};
+
+// ---------------- Game State ----------------
+const S = {
+  money:500, energy:100, day:1, season:0, time:6/24, // time fraction of day (0..1)
+  weather:'晴', tool:'hoe', seedSel:'wheat', buildSel:'fence',
+  tiles:{},            // key "x_z" -> {state:'grass|tilled|watered', crop, stage, watered, dead}
+  inventory:{},        // itemKey -> count  (seeds: seed_wheat ; crops: crop_wheat ; goods: egg, milk, wool)
+  seeds:{},            // seedKey -> count (seed_<crop>)
+  animals:[],          // {mesh, type, pos, affection, productTimer, hasProduct}
+  placed:[],           // {mesh, type, x,z}
+  paused:false, started:false,
+};
+
+// give starter seeds
+S.seeds = {seed_wheat:8, seed_carrot:4, seed_potato:0, seed_tomato:0, seed_strawberry:0,
+           seed_corn:0, seed_watermelon:0, seed_sunflower:0, seed_rose:0, seed_pumpkin:0};
+S.inventory = {};
+
+const tileKey = (x,z)=>x+'_'+z;
+function getTile(x,z){ const k=tileKey(x,z); if(!S.tiles[k]) S.tiles[k]={state:'grass',crop:null,stage:0,watered:false,dead:false}; return S.tiles[k]; }
+
+// ---------------- Three.js Setup ----------------
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xbfe3ff, 40, 130);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 500);
+
+// lights
+const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x4a6b3a, 0.9);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff3d0, 2.0);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 160;
+sun.shadow.camera.left=-60; sun.shadow.camera.right=60; sun.shadow.camera.top=60; sun.shadow.camera.bottom=-60;
+sun.shadow.bias = -0.0004;
+scene.add(sun);
+scene.add(sun.target);
+const moon = new THREE.DirectionalLight(0x9fb8ff, 0.0);
+scene.add(moon);
+
+// sky dome (vertex-colored gradient)
+const skyGeo = new THREE.SphereGeometry(300, 32, 16);
+const skyMat = new THREE.ShaderMaterial({
+  side:THREE.BackSide,
+  uniforms:{ top:{value:new THREE.Color(0x3a7bd5)}, bot:{value:new THREE.Color(0xcfe8ff)}, off:{value:0.0} },
+  vertexShader:`varying vec3 vp; void main(){ vp=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+  fragmentShader:`varying vec3 vp; uniform vec3 top; uniform vec3 bot; uniform float off;
+    void main(){ float h=normalize(vp).y*0.5+0.5+off; h=clamp(h,0.0,1.0); gl_FragColor=vec4(mix(bot,top,h),1.0);} `
+});
+scene.add(new THREE.Mesh(skyGeo, skyMat));
+
+// stars (visible at night)
+const starGeo = new THREE.BufferGeometry();
+const starN = 600, starPos=[];
+for(let i=0;i<starN;i++){
+  const r=260, u=Math.random(), v=Math.random();
+  const th=2*Math.PI*u, ph=Math.acos(2*v-1);
+  const y=r*Math.cos(ph);
+  if(y<10) continue;
+  starPos.push(r*Math.sin(ph)*Math.cos(th), y, r*Math.sin(ph)*Math.sin(th));
+}
+starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos,3));
+const starMat = new THREE.PointsMaterial({color:0xffffff, size:1.4, transparent:true, opacity:0});
+const stars = new THREE.Points(starGeo, starMat);
+scene.add(stars);
+
+// ---------------- Ground & Terrain ----------------
+const groundMat = new THREE.MeshStandardMaterial({color:0x6aa84f, roughness:1});
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400,400,1,1), groundMat);
+ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; ground.position.y=0;
+scene.add(ground);
+
+// rolling hills (decorative low-poly bumps in the distance)
+function makeHill(x,z,r,h,col){
+  const g=new THREE.SphereGeometry(r,10,8,0,Math.PI*2,0,Math.PI/2);
+  const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:col,roughness:1,flatShading:true}));
+  m.position.set(x,-r*0.1,z); m.scale.y=h; m.receiveShadow=true; scene.add(m);
+}
+for(let i=0;i<14;i++){
+  const a=Math.random()*Math.PI*2, d=90+Math.random()*70;
+  makeHill(Math.cos(a)*d, Math.sin(a)*d, 18+Math.random()*22, .35+Math.random()*.4,
+    new THREE.Color().setHSL(.28+Math.random()*.06,.4,.4+Math.random()*.1).getHex());
+}
+// distant snow mountains
+for(let i=0;i<6;i++){
+  const a=(i/6)*Math.PI*2, d=200;
+  const m=new THREE.Mesh(new THREE.ConeGeometry(45,70,5),
+    new THREE.MeshStandardMaterial({color:0xdfe9f2,roughness:1,flatShading:true}));
+  m.position.set(Math.cos(a)*d,18,Math.sin(a)*d); scene.add(m);
+}
+
+// river (simple reflective-ish plane)
+const river = new THREE.Mesh(new THREE.PlaneGeometry(8,400),
+  new THREE.MeshStandardMaterial({color:0x4aa6c8, roughness:0.2, metalness:0.1, transparent:true, opacity:0.85}));
+river.rotation.x=-Math.PI/2; river.position.set(-HALF-14,0.05,0); scene.add(river);
+
+// forest edge (trees ring around farm)
+const treeMatLeaf = new THREE.MeshStandardMaterial({color:0x4e8c3a, roughness:1, flatShading:true});
+const treeMatTrunk= new THREE.MeshStandardMaterial({color:0x6b4a2a, roughness:1});
+const treeLeafMats=[]; // keep refs for season tint
+function makeTree(x,z,s=1){
+  const g=new THREE.Group();
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.3*s,0.45*s,2.4*s,6), treeMatTrunk);
+  trunk.position.y=1.2*s; trunk.castShadow=true; g.add(trunk);
+  const lm = treeMatLeaf.clone(); treeLeafMats.push(lm);
+  for(let i=0;i<3;i++){
+    const c=new THREE.Mesh(new THREE.IcosahedronGeometry((1.6-i*0.35)*s,0), lm);
+    c.position.y=(2.6+i*1.0)*s; c.castShadow=true; g.add(c);
   }
-  const sfx = {
-    start: () => { beep('triangle', 660, .07, .18); setTimeout(()=>beep('triangle', 880, .07, .18), 90); },
-    star:  () => beep('square', 1200, .05, .15),
-    hit:   () => { beep('sawtooth', 220, .12, .25); setTimeout(()=>beep('sawtooth', 110, .2, .25), 60); }
-  };
+  g.position.set(x,0,z); scene.add(g); return g;
+}
+for(let i=0;i<60;i++){
+  const a=Math.random()*Math.PI*2, d=HALF+8+Math.random()*40;
+  const x=Math.cos(a)*d, z=Math.sin(a)*d;
+  if(Math.abs(x-(-HALF-14))<8) continue; // keep river clear
+  makeTree(x,z,.8+Math.random()*.8);
+}
 
-  // --- Game state ---
-  let running = false, paused = false, last = 0;
-  const player = {x: W/2, y: H-70, w: 36, h: 36, spd: 240, vx:0};
-  let obstacles = [], stars = [];
-  let time = 0, score = 0, best = +localStorage.mini_dodge_best_v2 || 0;
-  let spawnTimer = 0, starTimer = 0, difficulty = 1;
+// ---------------- Farm tiles (instanced) ----------------
+// Soil tiles rendered as thin boxes; we keep individual meshes for simplicity within grid.
+const soilGeo = new THREE.BoxGeometry(TILE*0.96, 0.25, TILE*0.96);
+const soilMatDry = new THREE.MeshStandardMaterial({color:0x6b4a2e, roughness:1});
+const soilMatWet = new THREE.MeshStandardMaterial({color:0x432b18, roughness:1});
+const tileMeshes = {}; // key -> mesh
+function worldFromTile(x,z){ return new THREE.Vector3(-HALF + x*TILE + TILE/2, 0, -HALF + z*TILE + TILE/2); }
 
-  // 难度参数
-  const diffSel = document.getElementById('diff');
-  function getDiffCfg(){
-    const d = diffSel.value;
-    if (d==='easy')   return {spd:1.0, spawn:0.9, accel:0.015, player:280};
-    if (d==='hard')   return {spd:1.25, spawn:0.65, accel:0.025, player:250};
-    if (d==='hell')   return {spd:1.5, spawn:0.5, accel:0.03,  player:240};
-    return {spd:1.1, spawn:0.75, accel:0.02, player:260}; // normal
+// crops container
+const cropMeshes = {}; // key -> Group
+
+function buildCropMesh(crop, stage){
+  const c = CROPS[crop];
+  const g = new THREE.Group();
+  const grow = stage/ (c.days); // 0..1 (stage can equal days = mature)
+  const matured = stage>=c.days;
+  const h = Math.max(0.15, c.tall*Math.min(1,grow+0.05));
+  if(stage===0){ // seed mound
+    const s=new THREE.Mesh(new THREE.SphereGeometry(0.12,6,5), new THREE.MeshStandardMaterial({color:0x7a5a3a}));
+    s.position.y=0.18; g.add(s); return g;
   }
-
-  function reset() {
-    const cfg = getDiffCfg();
-    player.x = W/2; player.vx = 0; player.spd = cfg.player;
-    obstacles = []; stars = [];
-    time = 0; score = 0; spawnTimer = 0; starTimer = 0;
-    difficulty = 1;
+  // stem
+  const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.09,h,5),
+    new THREE.MeshStandardMaterial({color:0x4e8c3a,roughness:1}));
+  stem.position.y=h/2+0.12; stem.castShadow=true; g.add(stem);
+  // leaves
+  for(let i=0;i<3;i++){
+    const lf=new THREE.Mesh(new THREE.SphereGeometry(0.18*Math.min(1,grow+0.3),5,4),
+      new THREE.MeshStandardMaterial({color:0x5aa83a,roughness:1,flatShading:true}));
+    lf.scale.set(1,0.4,1.6);
+    lf.position.set(Math.cos(i*2.1)*0.18, 0.2+h*0.5*Math.random(), Math.sin(i*2.1)*0.18);
+    g.add(lf);
   }
-
-  // Input
-  const keys = new Set();
-  window.addEventListener('keydown', e => {
-    if (['ArrowLeft','ArrowRight','a','d','A','D','w','s','W','S'].includes(e.key)) { keys.add(e.key.toLowerCase()); e.preventDefault(); }
-    if (e.key.toLowerCase()==='p') togglePause();
-  }, {passive:false});
-  window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
-
-  // Touch
-  let touchDir = 0;
-  function touchX(e){ return e.touches[0].clientX - cvs.getBoundingClientRect().left; }
-  function handleTouch(x) { touchDir = (x < cvs.width/2) ? -1 : 1; }
-  cvs.addEventListener('touchstart', e => { handleTouch(touchX(e)); e.preventDefault(); }, {passive:false});
-  cvs.addEventListener('touchmove',  e => { handleTouch(touchX(e)); e.preventDefault(); }, {passive:false});
-  cvs.addEventListener('touchend',  () => { touchDir = 0; });
-
-  // Buttons
-  document.getElementById('btnStart').onclick = () => { reset(); running = true; paused = false; last = performance.now(); sfx.start(); loop(last); };
-  document.getElementById('btnPause').onclick = togglePause;
-  diffSel.addEventListener('change', () => { if(!running) reset(); });
-  function togglePause(){ if (!running) return; paused = !paused; if (!paused) { last = performance.now(); loop(last); } }
-
-  // Utils
-  function rand(a,b){ return Math.random()*(b-a)+a; }
-  function rect(a,b){ return !(a.x+a.w<b.x || b.x+b.w<a.x || a.y+a.h<b.y || b.y+b.h<a.y); }
-
-  function spawnObstacle(){
-    const cfg = getDiffCfg();
-    const w = Math.random()*(58-28)+28;
-    const x = Math.random()*((W - 8) - (8 + w)) + (8);
-    const spd = (Math.random()*(160-120)+120) * difficulty * cfg.spd;
-    obstacles.push({x, y:-w, w, h:w, vy: spd});
-  }
-
-  function spawnStar() {
-    const s = 18;
-    const x = Math.random()*((W - 8) - (8 + s)) + (8);
-    const vy = Math.random()*(140-90)+90;
-    stars.push({x, y:-s, w:s, h:s, vy});
-  }
-
-  function update(dt){
-    const cfg = getDiffCfg();
-    time += dt; score += (dt*10)|0;
-    difficulty = 1 + Math.min(2.5, time/25);
-
-    // Player control
-    let dir = 0;
-    if (keys.has('arrowleft') || keys.has('a')) dir -= 1;
-    if (keys.has('arrowright') || keys.has('d')) dir += 1;
-    dir = touchDir || dir;
-    player.vx = dir * player.spd;
-    player.x += player.vx*dt;
-    player.x = Math.max(6, Math.min(W - player.w - 6, player.x));
-
-    // Spawn
-    spawnTimer -= dt;
-    if (spawnTimer <= 0) {
-      spawnObstacle();
-      spawnTimer = Math.max(0.12, cfg.spawn - time*cfg.accel);
+  // fruit/flower at maturity
+  if(grow>0.6 || matured){
+    const fc=new THREE.MeshStandardMaterial({color:c.color,roughness:0.6,
+      emissive:new THREE.Color(c.color).multiplyScalar(matured?0.12:0)});
+    const fruit=new THREE.Mesh(new THREE.SphereGeometry(matured?0.28:0.16,8,7), fc);
+    fruit.position.y=h+0.12; fruit.castShadow=true; g.add(fruit);
+    if(crop==='sunflower'||crop==='rose'){ // petals
+      for(let i=0;i<8;i++){
+        const p=new THREE.Mesh(new THREE.SphereGeometry(matured?0.14:0.08,5,4), fc);
+        p.scale.set(1,0.3,2);
+        p.position.set(Math.cos(i/8*6.28)*0.3, h+0.12, Math.sin(i/8*6.28)*0.3);
+        g.add(p);
+      }
     }
-    starTimer -= dt;
-    if (starTimer <= 0) {
-      spawnStar();
-      starTimer = Math.random()*(3.2-1.6)+1.6;
+  }
+  return g;
+}
+
+function refreshTileVisual(x,z){
+  const k=tileKey(x,z); const t=getTile(x,z); const pos=worldFromTile(x,z);
+  // soil
+  if(t.state==='grass'){
+    if(tileMeshes[k]){ scene.remove(tileMeshes[k]); delete tileMeshes[k]; }
+  } else {
+    if(!tileMeshes[k]){
+      const m=new THREE.Mesh(soilGeo, soilMatDry); m.position.copy(pos); m.position.y=0.12; m.receiveShadow=true;
+      scene.add(m); tileMeshes[k]=m;
     }
-
-    // Move
-    obstacles.forEach(o => o.y += o.vy*dt);
-    stars.forEach(s => s.y += s.vy*dt);
-
-    // Collisions
-    obstacles = obstacles.filter(o => {
-      if (rect({...player}, o)) gameOver();
-      return o.y < H + 60;
-    });
-    stars = stars.filter(s => {
-      if (rect({...player}, s)) { score += 120; sfx.star(); return false; }
-      return s.y < H + 40;
-    });
+    tileMeshes[k].material = (t.state==='watered'||t.watered)?soilMatWet:soilMatDry;
   }
+  // crop
+  if(cropMeshes[k]){ scene.remove(cropMeshes[k]); delete cropMeshes[k]; }
+  if(t.crop && !t.dead){
+    const cm=buildCropMesh(t.crop, t.stage); cm.position.copy(pos); scene.add(cm); cropMeshes[k]=cm;
+  } else if(t.dead){
+    const d=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.4,4),
+      new THREE.MeshStandardMaterial({color:0x6b5a3a})); d.position.copy(pos); d.position.y=0.3;
+    d.rotation.z=0.4; scene.add(d); cropMeshes[k]=d;
+  }
+}
 
-  function draw(){
-    // BG
-    const grad = ctx.createLinearGradient(0,0,0,H);
-    grad.addColorStop(0,'#0b0c10'); grad.addColorStop(1,'#12141a');
-    ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+// ---------------- Player (stylized character) ----------------
+const player = new THREE.Group();
+const skin=new THREE.MeshStandardMaterial({color:0xf0c08a,roughness:1});
+const shirt=new THREE.MeshStandardMaterial({color:0x4c84c4,roughness:1});
+const pants=new THREE.MeshStandardMaterial({color:0x6b4f2a,roughness:1});
+const hatM=new THREE.MeshStandardMaterial({color:0xd9b066,roughness:1});
 
-    // Score bar
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = 'bold 22px system-ui, Segoe UI';
-    ctx.fillText(`得分：${score}  最高：${best}`, 14, 30);
-    ctx.font = '12px system-ui'; ctx.globalAlpha = .8;
-    ctx.fillText(`难度：${diffSel.options[diffSel.selectedIndex].text}`, 14, 50);
-    ctx.globalAlpha = 1;
+const body=new THREE.Mesh(new THREE.CapsuleGeometry(0.32,0.5,4,8), shirt); body.position.y=1.0; body.castShadow=true; player.add(body);
+const head=new THREE.Mesh(new THREE.SphereGeometry(0.28,12,10), skin); head.position.y=1.6; head.castShadow=true; player.add(head);
+const hatBrim=new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.45,0.05,12), hatM); hatBrim.position.y=1.78; player.add(hatBrim);
+const hatTop=new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.3,0.25,12), hatM); hatTop.position.y=1.9; player.add(hatTop);
+// limbs
+const legL=new THREE.Mesh(new THREE.CapsuleGeometry(0.12,0.45,3,6), pants); legL.position.set(-0.16,0.45,0); player.add(legL);
+const legR=legL.clone(); legR.position.x=0.16; player.add(legR);
+const armL=new THREE.Mesh(new THREE.CapsuleGeometry(0.1,0.45,3,6), shirt); armL.position.set(-0.42,1.05,0); player.add(armL);
+const armR=armL.clone(); armR.position.x=0.42; player.add(armR);
+player.position.set(0,0,HALF-4);
+scene.add(player);
 
-    // Player
-    roundRect(player.x, player.y, player.w, player.h, 8, '#3fb950');
+// tool indicator on player's hand
+const toolMesh=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.6,0.08), new THREE.MeshStandardMaterial({color:0x8a6a3b}));
+toolMesh.position.set(0.5,1.0,0.2); player.add(toolMesh);
 
-    // Obstacles
-    obstacles.forEach(o => roundRect(o.x, o.y, o.w, o.h, 6, '#ff4d4f'));
+let playerFacing = 0; // radians
 
-    // Stars
-    stars.forEach(s => drawStar(s.x+s.w/2, s.y+s.h/2, 5, s.w/2, s.w/4, '#ffd866'));
+// ---------------- Buildings ----------------
+function box(w,h,d,color,rough=1){ return new THREE.Mesh(new THREE.BoxGeometry(w,h,d), new THREE.MeshStandardMaterial({color,roughness:rough})); }
+function addShadow(m){ m.castShadow=true; m.receiveShadow=true; return m; }
 
-    if (!running){
-      overlay(`躲避方块+`, '按「开始」或回车键开始');
-    } else if (paused){
-      overlay('暂停', '按「暂停」或 P 继续');
+// Farmhouse (upgradeable look)
+const house=new THREE.Group();
+const hbase=addShadow(box(7,3.4,6,0xcdb38b)); hbase.position.y=1.7; house.add(hbase);
+const roof=addShadow(new THREE.Mesh(new THREE.ConeGeometry(5.6,2.4,4), new THREE.MeshStandardMaterial({color:0x9a4a3a,roughness:1})));
+roof.position.y=4.6; roof.rotation.y=Math.PI/4; house.add(roof);
+const door=box(1.2,2,0.2,0x6b4a2a); door.position.set(0,1.0,3.05); house.add(door);
+const win1=box(1,1,0.2,0xbfe3ff,0.3); win1.position.set(-2,2,3.05); house.add(win1);
+const win2=win1.clone(); win2.position.x=2; house.add(win2);
+house.position.set(-HALF+5,0,HALF-5); scene.add(house);
+
+// red barn
+const barn=new THREE.Group();
+const bbase=addShadow(box(6,3.2,5,0xb23a2a)); bbase.position.y=1.6; barn.add(bbase);
+const broof=addShadow(new THREE.Mesh(new THREE.CylinderGeometry(3.2,3.2,5,12,1,false,0,Math.PI),
+  new THREE.MeshStandardMaterial({color:0x7a2a1a,roughness:1})));
+broof.rotation.z=Math.PI/2; broof.position.y=3.4; barn.add(broof);
+barn.position.set(HALF-6,0,HALF-6); scene.add(barn);
+
+// shop stand
+const shop=new THREE.Group();
+const counter=addShadow(box(3,1.2,2,0x8a6a3b)); counter.position.y=0.6; shop.add(counter);
+const awnPost1=box(0.15,2.4,0.15,0x6b4a2a); awnPost1.position.set(-1.4,1.2,0.9); shop.add(awnPost1);
+const awnPost2=awnPost1.clone(); awnPost2.position.x=1.4; shop.add(awnPost2);
+const awning=box(3.4,0.2,2.4,0xe0533a); awning.position.set(0,2.4,0); shop.add(awning);
+const shopSign=box(1.6,0.6,0.1,0xfff7e6); shopSign.position.set(0,1.9,1.05); shop.add(shopSign);
+shop.position.set(HALF-6,0,-HALF+8); scene.add(shop);
+
+// bed marker (sleep) near house
+const bed=new THREE.Group();
+const bframe=addShadow(box(2,0.6,3,0x8a6a3b)); bframe.position.y=0.3; bed.add(bframe);
+const mattress=box(1.8,0.3,2.6,0xeae0d0); mattress.position.y=0.7; bed.add(mattress);
+const pillow=box(1.6,0.2,0.7,0xffffff); pillow.position.set(0,0.85,-1.0); bed.add(pillow);
+bed.position.set(-HALF+10,0,HALF-5); scene.add(bed);
+
+// well
+const well=new THREE.Group();
+const wbase=addShadow(new THREE.Mesh(new THREE.CylinderGeometry(1,1,1.2,12), new THREE.MeshStandardMaterial({color:0x8a8a8a,roughness:1})));
+wbase.position.y=0.6; well.add(wbase);
+const wwater=new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.8,0.1,12), new THREE.MeshStandardMaterial({color:0x4aa6c8}));
+wwater.position.y=1.0; well.add(wwater);
+well.position.set(-2,0,HALF-3); scene.add(well);
+
+// windmill
+const windmill=new THREE.Group();
+const wmTower=addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.6,1.2,7,8), new THREE.MeshStandardMaterial({color:0xddd0b0,roughness:1})));
+wmTower.position.y=3.5; windmill.add(wmTower);
+const wmHub=new THREE.Group(); wmHub.position.set(0,6,1.2);
+for(let i=0;i<4;i++){ const bl=box(0.3,3,0.1,0xfff7e6); bl.position.y=1.5; const arm=new THREE.Group(); arm.add(bl); arm.rotation.z=i*Math.PI/2; wmHub.add(arm); }
+windmill.add(wmHub); windmill.position.set(HALF-10,0,2); scene.add(windmill);
+
+// greenhouse
+const greenhouse=new THREE.Group();
+const ghBody=new THREE.Mesh(new THREE.BoxGeometry(6,3,5), new THREE.MeshStandardMaterial({color:0xbfe3ff,roughness:0.1,transparent:true,opacity:0.4}));
+ghBody.position.y=1.5; greenhouse.add(ghBody);
+const ghRoof=new THREE.Mesh(new THREE.ConeGeometry(4.4,1.4,4), new THREE.MeshStandardMaterial({color:0xbfe3ff,transparent:true,opacity:0.4}));
+ghRoof.position.y=3.7; ghRoof.rotation.y=Math.PI/4; greenhouse.add(ghRoof);
+greenhouse.position.set(-HALF+6,0,-HALF+8); scene.add(greenhouse);
+
+// chicken coop
+const coop=new THREE.Group();
+const coopBody=addShadow(box(3,2,3,0xc89a5a)); coopBody.position.y=1; coop.add(coopBody);
+const coopRoof=addShadow(new THREE.Mesh(new THREE.ConeGeometry(2.6,1.2,4), new THREE.MeshStandardMaterial({color:0x7a4a2a})));
+coopRoof.position.y=2.6; coopRoof.rotation.y=Math.PI/4; coop.add(coopRoof);
+coop.position.set(HALF-6,0,2); scene.add(coop);
+
+// interaction points
+const interactZones=[
+  {name:'shop',  pos:new THREE.Vector3(HALF-6,0,-HALF+8), r:4, action:openShop, hint:'🏪 按 E 进入商店'},
+  {name:'bed',   pos:new THREE.Vector3(-HALF+10,0,HALF-5), r:4, action:sleep, hint:'🛏️ 按 E 睡觉到第二天'},
+  {name:'well',  pos:new THREE.Vector3(-2,0,HALF-3), r:3, action:refillEnergyWell, hint:'⛲ 按 E 在井边休息(+能量)'},
+];
+
+// ---------------- Animals (chickens, cow) ----------------
+function makeChicken(x,z){
+  const g=new THREE.Group();
+  const bodyc=addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.32,8,7), new THREE.MeshStandardMaterial({color:0xffffff,roughness:1})));
+  bodyc.scale.set(1,0.9,1.2); bodyc.position.y=0.4; g.add(bodyc);
+  const headc=new THREE.Mesh(new THREE.SphereGeometry(0.18,8,7), new THREE.MeshStandardMaterial({color:0xffffff})); headc.position.set(0,0.7,0.25); g.add(headc);
+  const beak=new THREE.Mesh(new THREE.ConeGeometry(0.06,0.14,4), new THREE.MeshStandardMaterial({color:0xe8a33a})); beak.rotation.x=Math.PI/2; beak.position.set(0,0.68,0.45); g.add(beak);
+  const comb=new THREE.Mesh(new THREE.SphereGeometry(0.07,6,5), new THREE.MeshStandardMaterial({color:0xe23a3a})); comb.position.set(0,0.85,0.25); g.add(comb);
+  g.position.set(x,0,z);
+  scene.add(g);
+  return {mesh:g, type:'chicken', affection:30, productTimer:Math.random()*30, hasProduct:false,
+          vx:0, vz:0, wanderT:0, home:new THREE.Vector3(x,0,z), product:'egg', emoji:'🥚'};
+}
+function makeCow(x,z){
+  const g=new THREE.Group();
+  const bodyc=addShadow(box(1.6,0.9,0.9,0xf0e8d8)); bodyc.position.y=0.9; g.add(bodyc);
+  // spots
+  for(let i=0;i<4;i++){ const s=new THREE.Mesh(new THREE.SphereGeometry(0.18,6,5), new THREE.MeshStandardMaterial({color:0x333})); s.position.set((Math.random()-0.5)*1.2,0.9+(Math.random()-0.3)*0.3,0.46*(Math.random()>0.5?1:-1)); g.add(s);}
+  const headc=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,0.5), new THREE.MeshStandardMaterial({color:0xf0e8d8})); headc.position.set(0.95,1.0,0); g.add(headc);
+  for(let i=0;i<4;i++){ const leg=box(0.18,0.7,0.18,0xd8cfc0); leg.position.set(i<2?0.5:-0.5, 0.35, i%2?0.3:-0.3); g.add(leg);}
+  g.position.set(x,0,z);
+  scene.add(g);
+  return {mesh:g, type:'cow', affection:30, productTimer:Math.random()*40, hasProduct:false,
+          vx:0,vz:0,wanderT:0, home:new THREE.Vector3(x,0,z), product:'milk', emoji:'🥛'};
+}
+// starter animals
+S.animals.push(makeChicken(HALF-8,4), makeChicken(HALF-5,3), makeCow(HALF-9,8));
+
+// product floating markers
+function setProductMarker(a){
+  if(a.marker){ a.mesh.remove(a.marker); a.marker=null; }
+  if(a.hasProduct){
+    const c=a.type==='chicken'?0xfff3d0:0xffffff;
+    const m=new THREE.Mesh(new THREE.SphereGeometry(0.14,8,7), new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:0.3}));
+    m.position.y=(a.type==='chicken'?1.1:1.7); a.mesh.add(m); a.marker=m;
+  }
+}
+
+// ---------------- Particles (weather / season) ----------------
+let particleSys=null;
+function buildParticles(){
+  if(particleSys){ scene.remove(particleSys); particleSys=null; }
+  let count=0, color=0xffffff, size=0.2;
+  if(S.weather==='雨'){ count=1200; color=0x9fc8e8; size=0.12; }
+  else if(S.weather==='雪'||S.season===3){ count=900; color=0xffffff; size=0.22; }
+  else if(S.season===0){ count=300; color=0xffd6e8; size=0.18; } // 樱花
+  else if(S.season===2){ count=350; color=0xe09030; size=0.2; }  // 落叶
+  else return;
+  const g=new THREE.BufferGeometry(), pos=[];
+  for(let i=0;i<count;i++) pos.push((Math.random()-0.5)*120, Math.random()*40, (Math.random()-0.5)*120);
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  particleSys=new THREE.Points(g, new THREE.PointsMaterial({color,size,transparent:true,opacity:0.85}));
+  particleSys.userData.kind=S.weather==='雨'?'rain':(S.weather==='雪'||S.season===3?'snow':'drift');
+  scene.add(particleSys);
+}
+
+// fireflies (night)
+const ffGeo=new THREE.BufferGeometry(), ffPos=[];
+for(let i=0;i<80;i++) ffPos.push((Math.random()-0.5)*40, 0.5+Math.random()*2, (Math.random()-0.5)*40);
+ffGeo.setAttribute('position', new THREE.Float32BufferAttribute(ffPos,3));
+const fireflies=new THREE.Points(ffGeo, new THREE.PointsMaterial({color:0xfff0a0,size:0.18,transparent:true,opacity:0}));
+scene.add(fireflies);
+
+// ---------------- Audio (synth, no assets) ----------------
+let actx; const sndOn=()=>true;
+function tone(type,f,dur,vol=0.15,when=0){
+  if(!actx) return;
+  const t0=actx.currentTime+when; const o=actx.createOscillator(), g=actx.createGain();
+  o.type=type; o.frequency.value=f; g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(vol,t0+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+dur); o.connect(g).connect(actx.destination); o.start(t0); o.stop(t0+dur+0.02);
+}
+const SFX={
+  till:()=>tone('sawtooth',120,0.18,0.18),
+  plant:()=>{tone('sine',520,0.1,0.12);tone('sine',680,0.1,0.12,0.08);},
+  water:()=>tone('sine',300,0.25,0.1),
+  harvest:()=>{tone('triangle',660,0.09,0.16);tone('triangle',880,0.09,0.16,0.09);tone('triangle',1100,0.12,0.16,0.18);},
+  coin:()=>{tone('square',880,0.06,0.12);tone('square',1320,0.08,0.12,0.06);},
+  no:()=>tone('sawtooth',140,0.12,0.12),
+  pet:()=>tone('sine',440,0.15,0.1),
+  sleep:()=>{tone('sine',330,0.3,0.1);tone('sine',262,0.4,0.1,0.2);},
+};
+// ambient music (simple gentle arpeggio scheduler)
+let musicTimer=0;
+const scaleNotes=[262,294,330,392,440,523,587]; // C major-ish
+function ambientMusic(dt){
+  if(!actx) return;
+  musicTimer-=dt;
+  if(musicTimer<=0){
+    const night = S.time>0.82||S.time<0.22;
+    const n=scaleNotes[Math.floor(Math.random()*scaleNotes.length)] * (night?0.5:1);
+    tone('sine',n,1.2, night?0.05:0.06);
+    if(Math.random()<0.5) tone('triangle',n*1.5,0.9,0.025,0.1);
+    musicTimer = night? 2.2+Math.random()*1.5 : 1.2+Math.random()*1.2;
+  }
+}
+
+// ---------------- Input ----------------
+const keys=new Set();
+addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' ','shift'].includes(k)) e.preventDefault();
+  keys.add(k);
+  if(!S.started) return;
+  if(k==='e') interact();
+  if(k>='1'&&k<='6'){ const t=TOOLS[parseInt(k)-1]; if(t){ S.tool=t.id; renderHotbar(); } }
+  if(k==='tab'){ e.preventDefault(); toggleModal('bagModal'); }
+  if(k==='escape'){ toggleModal('menuModal'); }
+},{passive:false});
+addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
+
+// camera orbit
+let camYaw=Math.PI, camPitch=0.5, camDist=12, dragging=false, lastX=0,lastY=0;
+const dom=renderer.domElement;
+dom.addEventListener('pointerdown',e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; });
+addEventListener('pointerup',()=>dragging=false);
+addEventListener('pointermove',e=>{
+  if(!dragging) return;
+  camYaw -= (e.clientX-lastX)*0.005; camPitch -= (e.clientY-lastY)*0.005;
+  camPitch=Math.max(0.12,Math.min(1.3,camPitch)); lastX=e.clientX; lastY=e.clientY;
+});
+dom.addEventListener('wheel',e=>{ camDist=Math.max(6,Math.min(22,camDist+e.deltaY*0.01)); e.preventDefault(); },{passive:false});
+// touch joystick (left half move, right half rotate)
+let touchMove=null, touchLook=null;
+dom.addEventListener('touchstart',e=>{
+  for(const t of e.changedTouches){
+    if(t.clientX<innerWidth/2 && !touchMove) touchMove={id:t.identifier,ox:t.clientX,oy:t.clientY,dx:0,dy:0};
+    else if(!touchLook) touchLook={id:t.identifier,x:t.clientX,y:t.clientY};
+  }
+},{passive:true});
+dom.addEventListener('touchmove',e=>{
+  for(const t of e.changedTouches){
+    if(touchMove&&t.identifier===touchMove.id){ touchMove.dx=t.clientX-touchMove.ox; touchMove.dy=t.clientY-touchMove.oy; }
+    if(touchLook&&t.identifier===touchLook.id){ camYaw-=(t.clientX-touchLook.x)*0.006; camPitch=Math.max(0.12,Math.min(1.3,camPitch-(t.clientY-touchLook.y)*0.006)); touchLook.x=t.clientX; touchLook.y=t.clientY; }
+  }
+},{passive:true});
+dom.addEventListener('touchend',e=>{
+  for(const t of e.changedTouches){
+    if(touchMove&&t.identifier===touchMove.id) touchMove=null;
+    if(touchLook&&t.identifier===touchLook.id) touchLook=null;
+  }
+},{passive:true});
+
+// ---------------- Target tile highlight ----------------
+const hl=new THREE.Mesh(new THREE.BoxGeometry(TILE,0.05,TILE),
+  new THREE.MeshBasicMaterial({color:0xffd866,transparent:true,opacity:0.35}));
+hl.visible=false; scene.add(hl);
+function targetTile(){
+  // tile in front of player
+  const fx=player.position.x+Math.sin(playerFacing)*TILE;
+  const fz=player.position.z+Math.cos(playerFacing)*TILE;
+  const tx=Math.floor((fx+HALF)/TILE), tz=Math.floor((fz+HALF)/TILE);
+  if(tx<0||tz<0||tx>=GRID||tz>=GRID) return null;
+  return {tx,tz};
+}
+
+// ---------------- Interaction ----------------
+function interact(){
+  if(!actx){ try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} }
+  // building interactions first
+  for(const z of interactZones){ if(player.position.distanceTo(z.pos)<z.r){ z.action(); return; } }
+  // animal interaction (feed / pet / collect)
+  let nearest=null,nd=2.4;
+  for(const a of S.animals){ const d=player.position.distanceTo(a.mesh.position); if(d<nd){nd=d;nearest=a;} }
+  if(nearest){
+    if(S.tool==='feed'){ feedAnimal(nearest); return; }
+    if(nearest.hasProduct){ collectProduct(nearest); return; }
+    petAnimal(nearest); return;
+  }
+  // tile tools
+  const t=targetTile(); if(!t) { toast('那里不能操作'); return; }
+  useTool(t.tx,t.tz);
+}
+
+function useTool(x,z){
+  const tile=getTile(x,z);
+  if(S.tool==='hoe'){
+    if(tile.state==='grass'){ if(!spendEnergy(2))return; tile.state='tilled'; refreshTileVisual(x,z); SFX.till(); }
+    else if(tile.crop){ tile.crop=null; tile.stage=0; tile.dead=false; tile.state='tilled'; refreshTileVisual(x,z); toast('已清理'); }
+    else toast('这里已经是耕地');
+  }
+  else if(S.tool==='seed'){
+    if(tile.state!=='tilled'&&tile.state!=='watered'){ toast('请先用锄头犁地'); SFX.no(); return; }
+    if(tile.crop){ toast('这格已种植'); return; }
+    const sk='seed_'+S.seedSel; if((S.seeds[sk]||0)<=0){ toast('没有'+CROPS[S.seedSel].name+'种子了 (商店购买)'); SFX.no(); return; }
+    const c=CROPS[S.seedSel];
+    if(!c.seasons.includes(S.season) && !inGreenhouse(x,z)){ toast(CROPS[S.seedSel].name+'不适合本季节种植'); SFX.no(); return; }
+    if(!spendEnergy(1)) return;
+    S.seeds[sk]--; tile.crop=S.seedSel; tile.stage=0; tile.watered=false; tile.dead=false;
+    refreshTileVisual(x,z); SFX.plant(); renderHotbar();
+  }
+  else if(S.tool==='water'){
+    if(!tile.crop){ toast('这里没有作物'); return; }
+    if(tile.watered){ toast('已浇过水'); return; }
+    if(!spendEnergy(1)) return;
+    tile.watered=true; tile.state='watered'; refreshTileVisual(x,z); SFX.water(); splash(worldFromTile(x,z));
+  }
+  else if(S.tool==='hand'){
+    if(tile.crop && tile.stage>=CROPS[tile.crop].days && !tile.dead){ harvest(x,z); }
+    else if(tile.dead){ tile.crop=null;tile.dead=false;tile.state='tilled'; refreshTileVisual(x,z); toast('清理了枯萎作物'); }
+    else toast('还未成熟');
+  }
+  else if(S.tool==='build'){
+    placeBuild(x,z);
+  }
+}
+
+function inGreenhouse(x,z){
+  const w=worldFromTile(x,z); return w.distanceTo(new THREE.Vector3(-HALF+6,0,-HALF+8))<4;
+}
+
+function harvest(x,z){
+  const tile=getTile(x,z); const c=CROPS[tile.crop];
+  // quality based on watering history + random
+  const roll=Math.random()+(tile.qualityBonus||0);
+  let q='普通', mult=1, qkey='';
+  if(roll>1.3){ q='完美'; mult=2; qkey='⭐⭐'; } else if(roll>0.8){ q='优质'; mult=1.5; qkey='⭐'; }
+  const ck='crop_'+tile.crop;
+  S.inventory[ck]=(S.inventory[ck]||0)+1;
+  S.inventory[ck+'_q']=Math.max(S.inventory[ck+'_q']||0, mult); // remember best quality seen (simplified)
+  tile.crop=null; tile.stage=0; tile.watered=false; tile.state='tilled';
+  refreshTileVisual(x,z); SFX.harvest(); harvestPop(worldFromTile(x,z), c.color);
+  toast(`收获 ${c.emoji} ${c.name} ${qkey} (${q})`);
+  addXP();
+}
+
+function placeBuild(x,z){
+  const b=BUILDABLES[S.buildSel];
+  if(S.money<b.cost){ toast('金币不足'); SFX.no(); return; }
+  const w=worldFromTile(x,z);
+  // prevent overlap
+  for(const p of S.placed){ if(Math.abs(p.x-x)<1&&Math.abs(p.z-z)<1){ toast('这里已有装饰'); return; } }
+  S.money-=b.cost; updateHUD(); SFX.coin();
+  let m;
+  if(S.buildSel==='fence'){ m=box(TILE*0.9,1.0,0.18,0x8a6a3b); m.position.set(w.x,0.5,w.z); }
+  else if(S.buildSel==='lantern'){ m=new THREE.Group(); const post=box(0.12,1.4,0.12,0x4a3a2a); post.position.y=0.7; m.add(post);
+    const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.25,8,7), new THREE.MeshStandardMaterial({color:0xff8a3a,emissive:0xff7a2a,emissiveIntensity:0.6})); lamp.position.y=1.5; m.add(lamp);
+    const lt=new THREE.PointLight(0xff9a4a,0,6); lt.position.y=1.5; m.add(lt); m.userData.light=lt; m.position.set(w.x,0,w.z); }
+  else if(S.buildSel==='flower'){ m=new THREE.Group(); const bedm=box(TILE*0.8,0.3,TILE*0.8,0x6b4a2a); bedm.position.y=0.15; m.add(bedm);
+    for(let i=0;i<6;i++){ const f=new THREE.Mesh(new THREE.SphereGeometry(0.12,6,5), new THREE.MeshStandardMaterial({color:new THREE.Color().setHSL(Math.random(),0.7,0.6)})); f.position.set((Math.random()-0.5)*1,0.4,(Math.random()-0.5)*1); m.add(f);} m.position.set(w.x,0,w.z); }
+  else if(S.buildSel==='scarecrow'){ m=new THREE.Group(); const pole=box(0.12,2,0.12,0x6b4a2a); pole.position.y=1; m.add(pole);
+    const cross=box(1.2,0.12,0.12,0x6b4a2a); cross.position.y=1.4; m.add(cross);
+    const hd=new THREE.Mesh(new THREE.SphereGeometry(0.25,8,7), new THREE.MeshStandardMaterial({color:0xd9b066})); hd.position.y=1.9; m.add(hd); m.position.set(w.x,0,w.z); }
+  addShadow(m); scene.add(m);
+  S.placed.push({mesh:m,type:S.buildSel,x,z});
+  toast(`建造了 ${b.emoji} ${b.name}`);
+}
+
+// animal actions
+function feedAnimal(a){
+  if((S.seeds['seed_wheat']||0)<=0 && (S.inventory['crop_wheat']||0)<=0){ toast('需要小麦/饲料喂食'); SFX.no(); return; }
+  if(S.seeds['seed_wheat']>0) S.seeds['seed_wheat']--; else S.inventory['crop_wheat']--;
+  a.affection=Math.min(100,a.affection+8); a.fed=true; SFX.pet(); toast(`${a.type==='chicken'?'🐔':'🐄'} 亲密度 +8`); renderHotbar();
+}
+function petAnimal(a){ a.affection=Math.min(100,a.affection+3); SFX.pet(); hearts(a.mesh.position); toast(`${a.type==='chicken'?'🐔':'🐄'} 好开心~ 亲密度 ${Math.round(a.affection)}`); }
+function collectProduct(a){
+  a.hasProduct=false; setProductMarker(a);
+  const key=a.product; S.inventory[key]=(S.inventory[key]||0)+1;
+  SFX.coin(); harvestPop(a.mesh.position, a.type==='chicken'?0xfff3d0:0xffffff);
+  toast(`收集了 ${a.emoji} ${a.product==='egg'?'鸡蛋':'牛奶'}`);
+}
+
+// ---------------- small particle pops ----------------
+const pops=[];
+function harvestPop(pos,color){
+  const g=new THREE.Group();
+  for(let i=0;i<8;i++){ const p=new THREE.Mesh(new THREE.SphereGeometry(0.08,5,4), new THREE.MeshBasicMaterial({color}));
+    p.position.copy(pos); p.position.y=0.5; p.userData.v=new THREE.Vector3((Math.random()-0.5)*3,3+Math.random()*2,(Math.random()-0.5)*3); g.add(p);}
+  scene.add(g); pops.push({g,t:0});
+}
+function splash(pos){ harvestPop(pos,0x6fc3e8); }
+function hearts(pos){
+  const g=new THREE.Group();
+  for(let i=0;i<5;i++){ const p=new THREE.Mesh(new THREE.SphereGeometry(0.1,5,4), new THREE.MeshBasicMaterial({color:0xff5a8a}));
+    p.position.copy(pos); p.position.y=1.2; p.userData.v=new THREE.Vector3((Math.random()-0.5)*1,2+Math.random(),(Math.random()-0.5)*1); g.add(p);}
+  scene.add(g); pops.push({g,t:0});
+}
+
+// ---------------- Energy / economy helpers ----------------
+function spendEnergy(n){ if(S.energy<n){ toast('能量不足，去睡觉或井边休息'); SFX.no(); return false; } S.energy-=n; updateHUD(); return true; }
+let xp=0, level=1;
+function addXP(){ xp+=10; if(xp>=level*100){ xp=0; level++; toast('🎉 农业等级提升到 '+level+'！能量上限+10'); } updateHUD(); }
+
+// ---------------- Day / season / sleep ----------------
+function newDay(){
+  S.day++;
+  // crops grow if watered
+  for(const k in S.tiles){
+    const t=S.tiles[k];
+    if(t.crop && !t.dead){
+      const c=CROPS[t.crop];
+      if(t.watered){ t.stage=Math.min(c.days,t.stage+1); t.qualityBonus=(t.qualityBonus||0)+0.12; }
+      else { t.missedWater=(t.missedWater||0)+1; if(t.missedWater>=2){ t.dead=true; } }
+      t.watered=false; if(t.state==='watered') t.state='tilled';
+      const [x,z]=k.split('_').map(Number); refreshTileVisual(x,z);
     }
   }
-
-  function overlay(title, sub){
-    ctx.fillStyle = 'rgba(0,0,0,.45)';
-    ctx.fillRect(0,0,W,H);
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = 'bold 36px system-ui';
-    ctx.textAlign='center';
-    ctx.fillText(title, W/2, H/2 - 10);
-    ctx.font = '16px system-ui';
-    ctx.fillText(sub, W/2, H/2 + 22);
-    ctx.textAlign='start';
+  // season change
+  if((S.day-1)%DAYS_PER_SEASON===0 && S.day>1){ S.season=(S.season+1)%4; applySeason(); toast('🍃 季节更替：'+SEASONS[S.season]); }
+  // weather roll
+  rollWeather();
+  // animal products
+  for(const a of S.animals){
+    let chance=0.5 + a.affection/200 + (a.fed?0.3:0);
+    if(Math.random()<chance){ a.hasProduct=true; setProductMarker(a); }
+    a.fed=false;
   }
+  updateHUD();
+}
+function sleep(){
+  S.time=6/24; S.energy=Math.min(maxEnergy(),100+ (level-1)*10);
+  newDay(); SFX.sleep(); saveGame();
+  flash('😴 一夜好眠… 第 '+S.day+' 天 ('+SEASONS[S.season]+')');
+}
+function refillEnergyWell(){ if(S.energy>=maxEnergy()){ toast('能量已满'); return;} S.energy=Math.min(maxEnergy(),S.energy+25); updateHUD(); SFX.water(); toast('☕ 在井边歇了歇 (+25 能量)'); }
+function maxEnergy(){ return 100+(level-1)*10; }
 
-  function gameOver(){
-    running = false;
-    best = Math.max(best, score);
-    localStorage.mini_dodge_best_v2 = best;
-    sfx.hit();
-    draw();
-    overlay('游戏结束', '再试一次吧！');
-  }
+function rollWeather(){
+  const r=Math.random();
+  if(S.season===3){ S.weather = r<0.4?'雪':(r<0.6?'雾':'晴'); }
+  else if(S.season===0){ S.weather = r<0.35?'雨':(r<0.45?'雾':'晴'); }
+  else if(S.season===1){ S.weather = r<0.2?'雨':'晴'; }
+  else { S.weather = r<0.3?'雨':(r<0.4?'雾':'晴'); }
+  // rain auto-waters crops next morning effect: water all crops
+  if(S.weather==='雨'){ for(const k in S.tiles){ const t=S.tiles[k]; if(t.crop&&!t.dead){ t.watered=true; const [x,z]=k.split('_').map(Number); refreshTileVisual(x,z);} } }
+  scene.fog.far = S.weather==='雾'?70:130;
+  buildParticles();
+}
 
-  function loop(ts){
-    if (!running) return;
-    const dt = Math.min(0.033, (ts - last)/1000);
-    last = ts;
-    if (!paused){
-      update(dt);
-      draw();
-    }
-    requestAnimationFrame(loop);
-  }
+const seasonGround=[0x6aa84f,0x5a9a3f,0x9a8a3a,0xdfe6ea];
+function applySeason(){
+  groundMat.color.setHex(seasonGround[S.season]);
+  // tree foliage
+  const leafCol=[0x6fae4a,0x4e8c3a,0xd98a30,0xcfe0e8][S.season];
+  treeLeafMats.forEach(m=>m.color.setHex(leafCol));
+  buildParticles();
+  // season chip
+  document.getElementById('seasonChip').innerHTML = SEASON_EMOJI[S.season]+' <b>'+SEASONS[S.season]+'</b>';
+}
 
-  // Helpers
-  function roundRect(x,y,w,h,r, color){
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(x+r,y);
-    ctx.arcTo(x+w,y,x+w,y+h,r);
-    ctx.arcTo(x+w,y+h,x,y+h,r);
-    ctx.arcTo(x,y+h,x,y,r);
-    ctx.arcTo(x,y,x+w,y,r);
-    ctx.closePath();
-    ctx.fill();
-  }
-  function drawStar(cx, cy, spikes, outerR, innerR, color){
-    let rot = Math.PI/2 * 3, x=cx, y=cy;
-    const step = Math.PI/spikes;
-    ctx.beginPath(); ctx.moveTo(cx, cy - outerR);
-    for (let i=0;i<spikes;i++){
-      x = cx + Math.cos(rot)*outerR; y = cy + Math.sin(rot)*outerR; ctx.lineTo(x,y); rot+=step;
-      x = cx + Math.cos(rot)*innerR; y = cy + Math.sin(rot)*innerR; ctx.lineTo(x,y); rot+=step;
-    }
-    ctx.closePath(); ctx.fillStyle = color; ctx.fill();
-  }
+// ---------------- HUD / UI ----------------
+const elDay=document.getElementById('dayNum'), elClock=document.getElementById('clockChip'),
+  elWeather=document.getElementById('weatherChip'), elEnergy=document.getElementById('energyBar'),
+  elMoney=document.getElementById('money'), elToast=document.getElementById('toast');
+const weatherEmoji={'晴':'☀️','雨':'🌧️','雪':'❄️','雾':'🌫️'};
 
-  // Enter to start/restart
-  window.addEventListener('keydown', e=>{
-    if (e.key === 'Enter'){
-      if (!running){ document.getElementById('btnStart').click(); }
-      else if (paused){ togglePause(); }
-    }
+function updateHUD(){
+  elDay.textContent=S.day;
+  elWeather.innerHTML=(weatherEmoji[S.weather]||'☀️')+' <b>'+S.weather+'</b>';
+  elEnergy.style.width=Math.max(0,(S.energy/maxEnergy())*100)+'%';
+  elMoney.textContent=S.money;
+}
+function updateClock(){
+  const h=Math.floor(S.time*24), m=Math.floor((S.time*24-h)*60);
+  let icon='🕖'; if(S.time<0.25)icon='🌅'; else if(S.time<0.5)icon='☀️'; else if(S.time<0.75)icon='🌇'; else icon='🌙';
+  elClock.innerHTML=icon+' <b>'+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+'</b>';
+}
+let toastT=0;
+function toast(msg){ elToast.textContent=msg; elToast.classList.add('show'); toastT=2.2; }
+function flash(msg){ toast(msg); }
+
+// hotbar
+const hotbar=document.getElementById('hotbar');
+function renderHotbar(){
+  hotbar.innerHTML='';
+  TOOLS.forEach(t=>{
+    const d=document.createElement('div'); d.className='slot'+(S.tool===t.id?' active':'');
+    let extra='';
+    if(t.id==='seed') extra=`<div class="cnt">${S.seeds['seed_'+S.seedSel]||0}</div>`;
+    if(t.id==='build') extra=`<div class="cnt">${BUILDABLES[S.buildSel].emoji}</div>`;
+    let label=t.name; if(t.id==='seed') label=CROPS[S.seedSel].name; if(t.id==='build') label=BUILDABLES[S.buildSel].name;
+    d.innerHTML=`<span class="key">${t.key}</span><div class="ic">${t.icon}</div><div class="nm">${label}</div>${extra}`;
+    d.onclick=()=>{
+      if(S.tool===t.id && t.id==='seed') cycleSeed();
+      else if(S.tool===t.id && t.id==='build') cycleBuild();
+      else { S.tool=t.id; }
+      renderHotbar();
+    };
+    hotbar.appendChild(d);
   });
+}
+function cycleSeed(){ const ks=Object.keys(CROPS); let i=ks.indexOf(S.seedSel); S.seedSel=ks[(i+1)%ks.length]; toast('选择种子：'+CROPS[S.seedSel].name); }
+function cycleBuild(){ const ks=Object.keys(BUILDABLES); let i=ks.indexOf(S.buildSel); S.buildSel=ks[(i+1)%ks.length]; toast('选择建造：'+BUILDABLES[S.buildSel].name); }
 
-  // First paint
-  draw();
+// modals
+function toggleModal(id){ const m=document.getElementById(id); m.classList.toggle('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
+document.getElementById('btnBag').onclick=()=>{ renderBag(); toggleModal('bagModal'); };
+document.getElementById('btnMenu').onclick=()=>{ updateSaveInfo(); toggleModal('menuModal'); };
 
-  // --- PWA 注册 ---
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js');
+// shop
+let shopTab='buy';
+function openShop(){ shopTab='buy'; document.querySelectorAll('#shopTabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab==='buy')); renderShop(); document.getElementById('shopModal').classList.add('show'); }
+document.querySelectorAll('#shopTabs button').forEach(b=>b.onclick=()=>{ shopTab=b.dataset.tab; document.querySelectorAll('#shopTabs button').forEach(x=>x.classList.toggle('on',x===b)); renderShop(); });
+function renderShop(){
+  const g=document.getElementById('shopGrid'); g.innerHTML='';
+  if(shopTab==='buy'){
+    // seeds
+    for(const key in CROPS){ const c=CROPS[key];
+      const inSeason=c.seasons.includes(S.season);
+      const it=document.createElement('div'); it.className='item';
+      it.innerHTML=`<div class="em">${c.emoji}</div><div class="t">${c.name}种子</div>
+        <div class="d">${c.days}天成熟 · ${inSeason?'<span style="color:#9ccc65">当季</span>':'<span style="opacity:.6">非当季</span>'}</div>
+        <div class="p">💰 ${c.seedCost}</div>`;
+      const b=document.createElement('button'); b.textContent='购买'; b.disabled=S.money<c.seedCost;
+      b.onclick=()=>{ if(S.money<c.seedCost){SFX.no();return;} S.money-=c.seedCost; S.seeds['seed_'+key]=(S.seeds['seed_'+key]||0)+1; SFX.coin(); updateHUD(); renderShop(); renderHotbar(); };
+      it.appendChild(b); g.appendChild(it);
+    }
+    // a baby animal
+    const anim=document.createElement('div'); anim.className='item';
+    anim.innerHTML=`<div class="em">🐔</div><div class="t">小鸡</div><div class="d">每天产蛋</div><div class="p">💰 120</div>`;
+    const ab=document.createElement('button'); ab.textContent='购买'; ab.disabled=S.money<120;
+    ab.onclick=()=>{ if(S.money<120){SFX.no();return;} S.money-=120; S.animals.push(makeChicken(HALF-6+Math.random()*3,2+Math.random()*4)); SFX.coin(); updateHUD(); renderShop(); toast('🐔 小鸡加入了农场！'); };
+    anim.appendChild(ab); g.appendChild(anim);
+    const cow=document.createElement('div'); cow.className='item';
+    cow.innerHTML=`<div class="em">🐄</div><div class="t">奶牛</div><div class="d">每天产奶</div><div class="p">💰 350</div>`;
+    const cb=document.createElement('button'); cb.textContent='购买'; cb.disabled=S.money<350;
+    cb.onclick=()=>{ if(S.money<350){SFX.no();return;} S.money-=350; S.animals.push(makeCow(HALF-9+Math.random()*3,7+Math.random()*3)); SFX.coin(); updateHUD(); renderShop(); toast('🐄 奶牛加入了农场！'); };
+    cow.appendChild(cb); g.appendChild(cow);
+  } else {
+    // sell crops + goods
+    const sellables=[];
+    for(const key in CROPS){ const ck='crop_'+key; if(S.inventory[ck]>0) sellables.push({key:ck, name:CROPS[key].name, emoji:CROPS[key].emoji, price:CROPS[key].sell, count:S.inventory[ck]}); }
+    if(S.inventory.egg>0) sellables.push({key:'egg',name:'鸡蛋',emoji:'🥚',price:30,count:S.inventory.egg});
+    if(S.inventory.milk>0) sellables.push({key:'milk',name:'牛奶',emoji:'🥛',price:55,count:S.inventory.milk});
+    if(!sellables.length){ g.innerHTML='<div class="empty">背包里没有可出售的物品<br>去收获作物或收集禽畜产品吧！</div>'; return; }
+    sellables.forEach(s=>{
+      const it=document.createElement('div'); it.className='item';
+      it.innerHTML=`<div class="em">${s.emoji}</div><div class="t">${s.name} ×${s.count}</div><div class="d">单价</div><div class="p">💰 ${s.price}</div>`;
+      const b=document.createElement('button'); b.className='sell'; b.textContent='出售 1';
+      b.onclick=()=>{ S.inventory[s.key]--; S.money+=s.price; SFX.coin(); updateHUD(); renderShop(); };
+      const b2=document.createElement('button'); b2.className='sell'; b2.textContent='全部出售'; b2.style.marginTop='4px';
+      b2.onclick=()=>{ S.money+=s.price*S.inventory[s.key]; S.inventory[s.key]=0; SFX.coin(); updateHUD(); renderShop(); };
+      it.appendChild(b); it.appendChild(b2); g.appendChild(it);
     });
   }
-})();
+}
+// inventory
+function renderBag(){
+  const g=document.getElementById('bagGrid'); g.innerHTML='';
+  const items=[];
+  for(const key in S.seeds){ if(S.seeds[key]>0){ const c=CROPS[key.replace('seed_','')]; items.push({emoji:'🌱',t:c.name+'种子',c:S.seeds[key]}); } }
+  for(const key in CROPS){ const ck='crop_'+key; if(S.inventory[ck]>0) items.push({emoji:CROPS[key].emoji,t:CROPS[key].name,c:S.inventory[ck]}); }
+  if(S.inventory.egg>0) items.push({emoji:'🥚',t:'鸡蛋',c:S.inventory.egg});
+  if(S.inventory.milk>0) items.push({emoji:'🥛',t:'牛奶',c:S.inventory.milk});
+  if(!items.length){ g.innerHTML='<div class="empty">背包是空的</div>'; return; }
+  items.forEach(i=>{ const d=document.createElement('div'); d.className='item';
+    d.innerHTML=`<div class="em">${i.emoji}</div><div class="t">${i.t}</div><div class="p">×${i.c}</div>`; g.appendChild(d); });
+  // stats footer
+  const f=document.createElement('div'); f.className='item'; f.style.gridColumn='1/-1';
+  f.innerHTML=`<div style="font-size:13px;opacity:.85">🌾 农业等级 <b>${level}</b> · 经验 ${xp}/${level*100} · 农场动物 ${S.animals.length} 只 · 装饰 ${S.placed.length} 件</div>`;
+  g.appendChild(f);
+}
+
+// ---------------- Save / Load ----------------
+const SAVE_KEY='perpetual_garden_v1';
+function saveGame(){
+  const data={ money:S.money,energy:S.energy,day:S.day,season:S.season,time:S.time,weather:S.weather,
+    seeds:S.seeds, inventory:S.inventory, tiles:S.tiles, level, xp,
+    player:{x:player.position.x,z:player.position.z},
+    animals:S.animals.map(a=>({type:a.type,x:a.mesh.position.x,z:a.mesh.position.z,affection:a.affection,hasProduct:a.hasProduct})),
+    placed:S.placed.map(p=>({type:p.type,x:p.x,z:p.z})),
+    ts:Date.now()
+  };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  toast('💾 已保存');
+}
+function loadGame(){
+  const raw=localStorage.getItem(SAVE_KEY); if(!raw) return false;
+  try{
+    const d=JSON.parse(raw);
+    S.money=d.money; S.energy=d.energy; S.day=d.day; S.season=d.season; S.time=d.time; S.weather=d.weather;
+    S.seeds=d.seeds||S.seeds; S.inventory=d.inventory||{}; S.tiles=d.tiles||{}; level=d.level||1; xp=d.xp||0;
+    if(d.player) player.position.set(d.player.x,0,d.player.z);
+    // rebuild tiles
+    for(const k in S.tiles){ const [x,z]=k.split('_').map(Number); refreshTileVisual(x,z); }
+    // rebuild animals
+    S.animals.forEach(a=>scene.remove(a.mesh)); S.animals=[];
+    (d.animals||[]).forEach(a=>{ const na=a.type==='cow'?makeCow(a.x,a.z):makeChicken(a.x,a.z); na.affection=a.affection; na.hasProduct=a.hasProduct; setProductMarker(na); S.animals.push(na); });
+    // rebuild placed
+    S.placed.forEach(p=>scene.remove(p.mesh)); S.placed=[];
+    (d.placed||[]).forEach(p=>{ S.buildSel=p.type; // reuse placeBuild without cost
+      const w=worldFromTile(p.x,p.z); S.money+=BUILDABLES[p.type].cost; placeBuild(p.x,p.z); });
+    applySeason(); buildParticles();
+    return true;
+  }catch(e){ console.warn(e); return false; }
+}
+function updateSaveInfo(){
+  const raw=localStorage.getItem(SAVE_KEY);
+  document.getElementById('saveInfo').textContent = raw? ('上次保存：'+new Date(JSON.parse(raw).ts).toLocaleString()) : '暂无存档';
+}
+document.getElementById('btnSave').onclick=()=>{ saveGame(); updateSaveInfo(); };
+document.getElementById('btnReset').onclick=()=>{ if(confirm('确定重置所有进度？')){ localStorage.removeItem(SAVE_KEY); location.reload(); } };
+
+// auto-save periodically
+setInterval(()=>{ if(S.started) saveGame(); }, 60000);
+addEventListener('beforeunload',()=>{ if(S.started) saveGame(); });
+
+// ---------------- Movement & main loop ----------------
+const clock=new THREE.Clock();
+let walkPhase=0;
+function update(dt){
+  // ----- movement -----
+  let mx=0,mz=0;
+  if(keys.has('w')||keys.has('arrowup')) mz-=1;
+  if(keys.has('s')||keys.has('arrowdown')) mz+=1;
+  if(keys.has('a')||keys.has('arrowleft')) mx-=1;
+  if(keys.has('d')||keys.has('arrowright')) mx+=1;
+  if(touchMove){ mx+=Math.max(-1,Math.min(1,touchMove.dx/50)); mz+=Math.max(-1,Math.min(1,touchMove.dy/50)); }
+  const moving=(mx||mz);
+  const run=keys.has('shift');
+  const speed=(run?9:5)*dt;
+  if(moving){
+    // movement relative to camera yaw
+    const ang=Math.atan2(mx,mz)+camYaw+Math.PI;
+    const dx=Math.sin(ang), dz=Math.cos(ang);
+    let nx=player.position.x+dx*speed, nz=player.position.z+dz*speed;
+    nx=Math.max(-HALF-30,Math.min(HALF+30,nx)); nz=Math.max(-HALF-30,Math.min(HALF+30,nz));
+    player.position.x=nx; player.position.z=nz;
+    playerFacing=ang;
+    player.rotation.y=ang;
+    walkPhase+=dt*(run?16:11);
+    legL.rotation.x=Math.sin(walkPhase)*0.6; legR.rotation.x=-Math.sin(walkPhase)*0.6;
+    armL.rotation.x=-Math.sin(walkPhase)*0.5; armR.rotation.x=Math.sin(walkPhase)*0.5;
+    body.position.y=1.0+Math.abs(Math.sin(walkPhase))*0.04;
+  } else {
+    legL.rotation.x*=0.8; legR.rotation.x*=0.8; armL.rotation.x*=0.8; armR.rotation.x*=0.8;
+  }
+
+  // ----- camera -----
+  const cx=player.position.x+Math.sin(camYaw)*camDist*Math.cos(camPitch);
+  const cy=player.position.y+camDist*Math.sin(camPitch)+1;
+  const cz=player.position.z+Math.cos(camYaw)*camDist*Math.cos(camPitch);
+  camera.position.lerp(new THREE.Vector3(cx,cy,cz), 0.15);
+  camera.lookAt(player.position.x, player.position.y+1.2, player.position.z);
+
+  // ----- target tile highlight -----
+  const tt=targetTile();
+  if(tt && (S.tool!=='feed')){ const w=worldFromTile(tt.tx,tt.tz); hl.position.set(w.x,0.15,w.z); hl.visible=true; }
+  else hl.visible=false;
+
+  // ----- interaction hints -----
+  let hint='移动 <b>WASD</b> · 转视角 <b>拖拽</b> · 工具 <b>E</b> · 切换 <b>1~6</b>';
+  for(const z of interactZones){ if(player.position.distanceTo(z.pos)<z.r){ hint=z.hint; } }
+  for(const a of S.animals){ if(player.position.distanceTo(a.mesh.position)<2.4){ hint = a.hasProduct? `按 E 收集 ${a.emoji}` : (S.tool==='feed'?'按 E 喂食':'按 E 抚摸 🐾'); } }
+  document.getElementById('helpText').innerHTML=hint;
+
+  // ----- time of day -----
+  S.time += dt/DAY_SECONDS;
+  if(S.time>=1){ S.time-=1; // a full day passed without sleeping -> still advance crops lightly? keep simple: auto next day at midnight
+    newDay(); }
+  updateDayNightCycle();
+  updateClock();
+
+  // ----- animals AI -----
+  for(const a of S.animals){
+    a.productTimer-=dt;
+    a.wanderT-=dt;
+    if(a.wanderT<=0){ a.wanderT=2+Math.random()*3; a.vx=(Math.random()-0.5)*(a.type==='cow'?0.6:1.2); a.vz=(Math.random()-0.5)*(a.type==='cow'?0.6:1.2); }
+    let nx=a.mesh.position.x+a.vx*dt, nz=a.mesh.position.z+a.vz*dt;
+    if(a.mesh.position.distanceTo(a.home)>6){ a.vx=(a.home.x-a.mesh.position.x)*0.2; a.vz=(a.home.z-a.mesh.position.z)*0.2; }
+    a.mesh.position.x=nx; a.mesh.position.z=nz;
+    if(a.vx||a.vz) a.mesh.rotation.y=Math.atan2(a.vx,a.vz);
+    a.mesh.position.y=Math.abs(Math.sin(performance.now()*0.004+a.home.x))*0.05; // little bob
+    if(a.marker) a.marker.position.y=(a.type==='chicken'?1.1:1.7)+Math.sin(performance.now()*0.003)*0.1;
+  }
+
+  // ----- particles -----
+  if(particleSys){
+    const p=particleSys.geometry.attributes.position; const arr=p.array; const kind=particleSys.userData.kind;
+    for(let i=0;i<arr.length;i+=3){
+      if(kind==='rain'){ arr[i+1]-=dt*40; arr[i]-=dt*4; }
+      else if(kind==='snow'){ arr[i+1]-=dt*4; arr[i]+=Math.sin(performance.now()*0.001+i)*dt*1.5; }
+      else { arr[i+1]-=dt*3; arr[i]+=Math.sin(performance.now()*0.0008+i)*dt*2; arr[i+2]+=Math.cos(performance.now()*0.0006+i)*dt; }
+      if(arr[i+1]<0){ arr[i+1]=40; arr[i]=(Math.random()-0.5)*120; arr[i+2]=(Math.random()-0.5)*120; }
+    }
+    p.needsUpdate=true;
+    particleSys.position.x=player.position.x; particleSys.position.z=player.position.z;
+  }
+  // fireflies follow + flicker at night
+  const night = S.time>0.8||S.time<0.22;
+  fireflies.material.opacity = THREE.MathUtils.lerp(fireflies.material.opacity, (night&&S.weather==='晴')?0.9:0, 0.05);
+  fireflies.position.set(player.position.x, 0, player.position.z);
+  const fp=fireflies.geometry.attributes.position;
+  for(let i=0;i<fp.array.length;i+=3){ fp.array[i]+=Math.sin(performance.now()*0.001+i)*dt*0.6; fp.array[i+1]+=Math.cos(performance.now()*0.0013+i)*dt*0.4; }
+  fp.needsUpdate=true;
+
+  // ----- lantern lights at night -----
+  for(const p of S.placed){ if(p.type==='lantern'&&p.mesh.userData.light){ p.mesh.userData.light.intensity = night?1.6:0; } }
+
+  // ----- windmill spin -----
+  wmHub.rotation.z += dt*0.8;
+  // river shimmer
+  river.material.opacity=0.8+Math.sin(performance.now()*0.001)*0.05;
+
+  // ----- pops -----
+  for(let i=pops.length-1;i>=0;i--){ const pp=pops[i]; pp.t+=dt;
+    pp.g.children.forEach(c=>{ c.userData.v.y-=9*dt; c.position.addScaledVector(c.userData.v,dt); c.material.opacity=Math.max(0,1-pp.t); c.material.transparent=true; });
+    if(pp.t>1){ scene.remove(pp.g); pops.splice(i,1); }
+  }
+
+  // toast timer
+  if(toastT>0){ toastT-=dt; if(toastT<=0) elToast.classList.remove('show'); }
+}
+
+function updateDayNightCycle(){
+  // sun angle based on time (0=midnight)
+  const a=(S.time-0.25)*Math.PI*2; // sunrise ~0.25
+  const sx=Math.cos(a)*60, sy=Math.sin(a)*60, sz=20;
+  sun.position.set(sx, Math.max(-20,sy), sz);
+  sun.target.position.copy(player.position);
+  const daylight=Math.max(0, Math.sin(a)); // 0 at night, 1 at noon
+  sun.intensity=daylight*2.2;
+  hemi.intensity=0.25+daylight*0.75;
+  moon.position.set(-sx,Math.max(0,-sy),sz); moon.intensity=(1-daylight)*0.25;
+  // sky colors
+  const dayTop=new THREE.Color(0x3a7bd5), dayBot=new THREE.Color(0xcfe8ff);
+  const nightTop=new THREE.Color(0x0a1030), nightBot=new THREE.Color(0x1a2548);
+  const duskTop=new THREE.Color(0xc85a3a), duskBot=new THREE.Color(0xf2a060);
+  let top,bot;
+  const dusk=Math.pow(1-Math.abs(daylight-0.15)/0.15,2); // near horizon glow
+  if(daylight>0.25){ top=dayTop.clone(); bot=dayBot.clone(); }
+  else { const f=daylight/0.25; top=nightTop.clone().lerp(daylight>0.05?duskTop:dayTop,f); bot=nightBot.clone().lerp(duskBot,f); }
+  skyMat.uniforms.top.value.copy(top); skyMat.uniforms.bot.value.copy(bot);
+  scene.fog.color.copy(bot);
+  starMat.opacity=Math.max(0,1-daylight*3);
+  // vignette darkness
+  const dark=Math.max(0, 1-daylight*2);
+  document.getElementById('vignette').style.boxShadow=`inset 0 0 220px rgba(0,0,30,${dark*0.6})`;
+  renderer.toneMappingExposure = 0.7+daylight*0.5;
+}
+
+// ---------------- Loop ----------------
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(0.05, clock.getDelta());
+  if(S.started && !S.paused){ update(dt); ambientMusic(dt); }
+  renderer.render(scene,camera);
+}
+animate();
+
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
+// ---------------- Boot ----------------
+function startGame(fromSave){
+  S.started=true;
+  document.getElementById('hud').style.display='block';
+  closeModal('menuModal');
+  applySeason(); updateHUD(); renderHotbar(); buildParticles();
+  if(!actx){ try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} }
+  toast(fromSave?'欢迎回到田园 🌾':'欢迎来到永续田园！锄地(1)→播种(2)→浇水(3)→收获(4)');
+}
+document.getElementById('btnStart').onclick=()=>{ startGame(false); };
+
+// loader sequence
+const lb=document.getElementById('loadbar'), tip=document.getElementById('loadtip');
+const tips=['正在播种世界…','点亮晨光…','唤醒农场动物…','铺设田垄…','准备就绪！'];
+let lp=0;
+const li=setInterval(()=>{
+  lp+=20; lb.style.width=lp+'%'; tip.textContent=tips[Math.min(tips.length-1,Math.floor(lp/20))];
+  if(lp>=100){ clearInterval(li);
+    setTimeout(()=>{
+      const loader=document.getElementById('loader'); loader.style.opacity='0'; setTimeout(()=>loader.style.display='none',800);
+      const had=loadGame();
+      updateSaveInfo();
+      if(had){ // auto-resume
+        document.getElementById('menuModal').classList.remove('show');
+        startGame(true);
+      } else {
+        document.getElementById('menuModal').classList.add('show');
+      }
+    }, 300);
+  }
+},220);
+
+// ---------------- PWA ----------------
+if('serviceWorker' in navigator){ addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{})); }
+
+// expose for debugging
+window.__garden=S;
 </script>
 </body>
 </html>
