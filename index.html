@@ -393,8 +393,8 @@ for(let i=0;i<60;i++){
 // ---------------- Farm tiles (instanced) ----------------
 // Soil tiles rendered as thin boxes; we keep individual meshes for simplicity within grid.
 const soilGeo = new THREE.BoxGeometry(TILE*0.96, 0.25, TILE*0.96);
-const soilMatDry = new THREE.MeshStandardMaterial({color:0x6b4a2e, roughness:1});
-const soilMatWet = new THREE.MeshStandardMaterial({color:0x432b18, roughness:1});
+const soilMatDry = new THREE.MeshStandardMaterial({color:0x6b4a2e, roughness:1, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1});
+const soilMatWet = new THREE.MeshStandardMaterial({color:0x432b18, roughness:1, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1});
 const tileMeshes = {}; // key -> mesh
 function worldFromTile(x,z){ return new THREE.Vector3(-HALF + x*TILE + TILE/2, 0, -HALF + z*TILE + TILE/2); }
 
@@ -709,8 +709,8 @@ dom.addEventListener('touchend',e=>{
 },{passive:true});
 
 // ---------------- Target tile highlight ----------------
-const hl=new THREE.Mesh(new THREE.BoxGeometry(TILE,0.05,TILE),
-  new THREE.MeshBasicMaterial({color:0xffd866,transparent:true,opacity:0.35}));
+const hl=new THREE.Mesh(new THREE.BoxGeometry(TILE*0.98,0.04,TILE*0.98),
+  new THREE.MeshBasicMaterial({color:0xffd866,transparent:true,opacity:0.4,depthWrite:false}));
 hl.visible=false; scene.add(hl);
 function targetTile(){
   // tile in front of player
@@ -1080,7 +1080,7 @@ function update(dt){
   const speed=(run?9:5)*dt;
   if(moving){
     // movement relative to camera yaw
-    const ang=Math.atan2(mx,mz)+camYaw+Math.PI;
+    const ang=Math.atan2(mx,mz)+camYaw;
     const dx=Math.sin(ang), dz=Math.cos(ang);
     let nx=player.position.x+dx*speed, nz=player.position.z+dz*speed;
     nx=Math.max(-HALF-30,Math.min(HALF+30,nx)); nz=Math.max(-HALF-30,Math.min(HALF+30,nz));
@@ -1104,7 +1104,7 @@ function update(dt){
 
   // ----- target tile highlight -----
   const tt=targetTile();
-  if(tt && (S.tool!=='feed')){ const w=worldFromTile(tt.tx,tt.tz); hl.position.set(w.x,0.15,w.z); hl.visible=true; }
+  if(tt && (S.tool!=='feed')){ const w=worldFromTile(tt.tx,tt.tz); hl.position.set(w.x,0.30,w.z); hl.visible=true; }
   else hl.visible=false;
 
   // ----- interaction hints -----
